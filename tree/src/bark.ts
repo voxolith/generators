@@ -10,11 +10,10 @@
 // constant in voxels as the trunk tapers. That single detail is what makes
 // bark read as texture at this resolution rather than as noise.
 
-import { frame, type Noise, type Volume } from "@voxolith/engine/build";
+import { segmentFrames, type Noise, type Skeleton, type Volume } from "@voxolith/engine/build";
 import type { Vec3 } from "@voxolith/engine";
 import { isWood, ROLE } from "./roles";
 import type { LookParams, ShapeParams } from "./params";
-import type { Skeleton } from "./skeleton";
 
 export function paintBark(
   vol: Volume,
@@ -26,17 +25,7 @@ export function paintBark(
   noise: Noise,
 ): void {
   const segs = skel.segments;
-  // Per-segment frames, computed once.
-  const fx = new Float32Array(segs.length * 9);
-  const segLen = new Float32Array(segs.length);
-  for (let i = 0; i < segs.length; i++) {
-    const s = segs[i];
-    const d: Vec3 = [s.b[0] - s.a[0], s.b[1] - s.a[1], s.b[2] - s.a[2]];
-    const len = Math.hypot(d[0], d[1], d[2]) || 1;
-    segLen[i] = len;
-    const [f, side, up2] = frame(d);
-    fx.set([f[0], f[1], f[2], side[0], side[1], side[2], up2[0], up2[1], up2[2]], i * 9);
-  }
+  const { frames: fx, lengths: segLen } = segmentFrames(segs);
 
   const wavelength = Math.max(2, look.furrowWavelength);
   const axialFreq = 1 / (wavelength * 8); // ~8:1 anisotropy: furrows run up, not around

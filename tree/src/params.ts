@@ -7,29 +7,12 @@
 // Lengths expressed as a ratio of `height` scale automatically. Lengths given
 // in voxels are tuned for a 192-tall tree and are scaled by height/192.
 
+import type { BranchLevel } from "@voxolith/engine/build";
+
+export type { BranchLevel };
+
 export type SpeciesKind = "broadleaf" | "conifer";
 export type Season = "spring" | "summer" | "autumn" | "winter";
-
-/** Per-branch-level growth rules. Index 0 describes level 1 (the limbs). */
-export interface BranchLevel {
-  /** Children spawned per parent, inclusive range. */
-  count: [number, number];
-  /** Child length as a fraction of the parent's. */
-  lenRatio: number;
-  /** Random spread on that length, ±fraction. */
-  lenVar: number;
-  /** Angle away from the parent axis. */
-  downDeg: number;
-  downVarDeg: number;
-  /** Arc length between polyline points, in voxels at height 192. */
-  segLen: number;
-  /** Downward bend per voxel travelled; thin branches get more. */
-  gravity: number;
-  /** Upward bend per voxel travelled, ramped toward the tip. */
-  photo: number;
-  /** Amplitude of the correlated direction wobble. */
-  curl: number;
-}
 
 export interface TrunkParams {
   /** Trunk length as a fraction of tree height. */

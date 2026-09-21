@@ -141,7 +141,7 @@ export const OAK: TreeParams = {
   },
   foliage: {
     enabled: true,
-    clusterRadius: 4.5,
+    clusterRadius: 6,
     clusterFlatten: 0.62,
     spacing: 2.5,
     tipBoost: 1.2,
@@ -149,7 +149,7 @@ export const OAK: TreeParams = {
     fillRim: 0.66,
     shellDepth: 14,
     macroScale: 0.045,
-    macroThreshold: 0.38,
+    macroThreshold: 0.25,
     sheathRadius: 2.6,
     sheathFill: 0.45,
     coneExp: 1.05,
@@ -187,7 +187,7 @@ export const MAPLE: TreeParams = derive(OAK, "maple", (p) => {
   p.shape.levels[0].downDeg = 48;
   p.shape.levels[0].count = [4, 6];
   p.shape.levels[1].downDeg = 42;
-  p.foliage.clusterRadius = 4.2;
+  p.foliage.clusterRadius = 5.6;
   p.foliage.shellDepth = 12;
   p.look.plateWarp = 0.18;
   p.look.furrowWavelength = 4;
@@ -206,9 +206,9 @@ export const BIRCH: TreeParams = derive(OAK, "birch", (p) => {
   p.shape.levels[1].gravity = 0.016;
   p.shape.levels[2].gravity = 0.022;
   p.shape.levels[3].gravity = 0.03; // drooping outer twigs
-  p.foliage.clusterRadius = 3.4;
+  p.foliage.clusterRadius = 4.4;
   p.foliage.shellDepth = 9;
-  p.foliage.macroThreshold = 0.34;
+  p.foliage.macroThreshold = 0.22;
   // Birch bark is smooth with dark lenticel marks, not furrowed.
   p.look.plateWarp = 0;
   p.look.furrowWavelength = 3;

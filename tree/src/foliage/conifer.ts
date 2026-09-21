@@ -4,12 +4,10 @@
 // jittered cone, and the gaps between whorls are protected. Those gaps are the
 // spruce read — let the plates merge and you get a green traffic cone.
 
-import { capsule, type Noise, type Volume } from "@voxolith/engine/build";
+import { capsule, type ClusterResult, type Noise, type Skeleton, type Volume } from "@voxolith/engine/build";
 import type { Vec3 } from "@voxolith/engine";
 import { ROLE } from "../roles";
 import type { FoliageParams, ShapeParams } from "../params";
-import type { Skeleton } from "../skeleton";
-import type { ClusterResult } from "./broadleaf";
 
 export function placeConiferNeedles(
   vol: Volume,

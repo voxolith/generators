@@ -46,6 +46,13 @@ const isWoodMask = (() => {
 })();
 export const isWood = (v: number): boolean => v <= ROLE_COUNT && isWoodMask[v] === 1;
 
+const isLeafMask = (() => {
+  const m = new Uint8Array(ROLE_COUNT + 1);
+  for (const r of LEAF_ROLES) m[r] = 1;
+  return m;
+})();
+export const isLeaf = (v: number): boolean => v <= ROLE_COUNT && isLeafMask[v] === 1;
+
 const ID = [
   "wood.heart",
   "bark.dark",

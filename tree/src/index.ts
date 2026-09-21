@@ -1,21 +1,34 @@
 // @voxolith/gen-tree — procedural voxel trees.
 //
-// One pipeline, two species families: grow a skeleton, rasterise it as wood,
-// paint bark on the surface only, hang foliage off the twigs, carve the canopy
-// so it has gaps and a ragged outline, colour the leaves, then prune anything
-// that ended up disconnected so the result is always a single piece.
+// One pipeline, two species families: grow a branch skeleton, rasterise it as
+// wood, paint bark on the surface only, hang foliage off the twigs, carve the
+// canopy so it has gaps and a ragged outline, colour the leaves, then prune
+// anything that ended up disconnected so the result is always a single piece.
+//
+// The generic parts — branch growth, clump placement, canopy carving and
+// exposure shading — live in @voxolith/engine/build and are shared with the
+// other vegetation generators.
 
-import { makeNoise, Volume } from "@voxolith/engine/build";
+import {
+  buildHull,
+  carveCanopy,
+  fitHeight,
+  growBranches,
+  makeNoise,
+  shadeByExposure,
+  skyOcclusion,
+  Volume,
+  type BranchParams,
+  type ClusterResult,
+} from "@voxolith/engine/build";
 import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
-import { buildHull, carveCanopy, shadeLeaves, skyOcclusion } from "./canopy";
 import { paintBark } from "./bark";
-import { placeBroadleafClusters, type ClusterResult } from "./foliage/broadleaf";
+import { placeBroadleafClusters } from "./foliage/broadleaf";
 import { placeConiferNeedles } from "./foliage/conifer";
 import { applyAgeAndHealth, applyBlossom, applySnow, planSeason } from "./season";
-import { buildRoles, isWood } from "./roles";
-import { cloneParams, REFERENCE_HEIGHT, type TreeParams } from "./params";
+import { buildRoles, isLeaf, isWood, ROLE } from "./roles";
+import { cloneParams, REFERENCE_HEIGHT, type ShapeParams, type TreeParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
-import { fitHeight, growSkeleton } from "./skeleton";
 import { voxelizeWood } from "./voxelize";
 
 export interface TreeStats {
@@ -39,6 +52,41 @@ export interface TreeResult {
   stats: TreeStats;
 }
 
+/** Translate the tree's ratio-based parameters into absolute branch growth. */
+function branchParamsFor(shape: ShapeParams, rng: () => number): BranchParams {
+  const deg = (d: number) => (d * Math.PI) / 180;
+  const leanAz = rng() * Math.PI * 2;
+  const lean = deg(shape.trunk.leanDeg) * rng();
+  const dir: Vec3 = [Math.sin(lean) * Math.cos(leanAz), Math.cos(lean), Math.sin(lean) * Math.sin(leanAz)];
+  return {
+    seeds: [
+      {
+        origin: [0, 0, 0],
+        dir,
+        length: shape.height * shape.trunk.lengthRatio,
+        radius: shape.height * shape.trunk.radiusRatio,
+      },
+    ],
+    base: {
+      taperExp: shape.trunk.taperExp,
+      sweepDeg: shape.trunk.sweepDeg,
+      curl: shape.trunk.curl,
+      segLen: shape.trunk.segLen,
+    },
+    childStart: shape.crownStartRatio,
+    childEnd: shape.crownEndRatio,
+    envelope: shape.envelope,
+    azimuthJitterDeg: shape.azimuthJitterDeg,
+    whorl: shape.whorl,
+    whorlSpacing: shape.height * shape.whorlSpacingRatio,
+    pipeExp: shape.pipeExp,
+    branchTaper: shape.branchTaper,
+    minRadius: shape.minRadius,
+    levels: shape.levels,
+    unit: shape.height / REFERENCE_HEIGHT,
+  };
+}
+
 export function generateTree(params: TreeParams, rng: () => number, id = "tree"): TreeResult {
   const t0 = performance.now();
   const p = cloneParams(params);
@@ -49,7 +97,7 @@ export function generateTree(params: TreeParams, rng: () => number, id = "tree")
   const plan = planSeason(p.look, p.shape.kind);
   const foliageOn = p.foliage.enabled && !plan.bare;
 
-  const skel = growSkeleton(p.shape, rng, noise);
+  const skel = growBranches(branchParamsFor(p.shape, rng), rng, noise);
   // Foliage sits above the topmost twig, so leave it headroom before fitting.
   const headroom = foliageOn
     ? p.shape.kind === "broadleaf"
@@ -76,19 +124,31 @@ export function generateTree(params: TreeParams, rng: () => number, id = "tree")
       p.shape.kind === "broadleaf"
         ? placeBroadleafClusters(vol, skel, p.shape, p.foliage, origin, noise, rng, vs, density)
         : placeConiferNeedles(vol, skel, p.shape, p.foliage, origin, noise, rng, vs, density);
-    const hull = buildHull(vol, origin[0], origin[2]);
-    carve = carveCanopy(vol, hull, p.foliage, noise, vs);
-    const sky = skyOcclusion(vol);
-    shadeLeaves(vol, {
+    const hull = buildHull(vol, origin[0], origin[2], isLeaf);
+    carve = carveCanopy(
+      vol,
       hull,
-      sky,
+      isLeaf,
+      {
+        shellDepth: p.foliage.shellDepth * vs,
+        macroScale: p.foliage.macroScale / vs,
+        macroThreshold: p.foliage.macroThreshold,
+      },
+      noise,
+    );
+    shadeByExposure(vol, {
+      isTarget: isLeaf,
+      hull,
+      sky: skyOcclusion(vol),
       clusterId: cluster.clusterId,
       noise,
-      look: p.look,
-      vs,
       tones: plan.tones,
       edge: plan.edge,
       accent: plan.accent,
+      accentFraction: p.look.accentFraction,
+      dead: ROLE.LEAF_DEAD,
+      deadFraction: (1 - p.look.health) * 0.3,
+      ditherScale: 0.08 / vs,
     });
     if (p.look.season === "spring") applyBlossom(vol, cluster.clusterId, p.look.blossom);
   }
@@ -108,8 +168,7 @@ export function generateTree(params: TreeParams, rng: () => number, id = "tree")
     }
   }
 
-  const roles = buildRoles(skinFor(p.species, p.look.season));
-  const model = vol.crop(origin, roles);
+  const model = vol.crop(origin, buildRoles(skinFor(p.species, p.look.season)));
   let woodFinal = 0;
   let leafFinal = 0;
   for (let i = 0; i < vol.data.length; i++) {

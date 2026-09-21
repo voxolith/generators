@@ -8,11 +8,10 @@
 // segments at sub-voxel steps is the classic way to end up with twigs that a
 // connectivity check treats as detached.
 
-import { capsule, line3, type Volume } from "@voxolith/engine/build";
+import { capsule, line3, type Skeleton, type Volume } from "@voxolith/engine/build";
 import type { Vec3 } from "@voxolith/engine";
 import { ROLE } from "./roles";
 import type { ShapeParams } from "./params";
-import type { Skeleton } from "./skeleton";
 
 export interface WoodResult {
   /** Segment index + 1 for every wood voxel, so the bark pass can recover a frame. */
