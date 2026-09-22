@@ -1,0 +1,5 @@
+node_modules
+dist
+previews
+out
+*.local
