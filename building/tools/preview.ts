@@ -1,9 +1,9 @@
 // Contact sheets for iterating on the look.
-//   bun tools/preview.ts [species|roofs|walls|seeds] [--width N]
+//   bun tools/preview.ts [species|roofs|walls|seeds|closeup] [--width N]
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { seededRandom } from "@voxolith/renderer/core";
-import { contactSheet, encodePng, renderEntity, type SheetCell } from "@voxolith/gen-kit/preview";
+import { contactSheet, encodePng, renderEntity, type RenderOptions, type SheetCell } from "@voxolith/gen-kit/preview";
 import { PRESETS, PRESET_NAMES } from "../src/index";
 import { GENERATE } from "./shared";
 
@@ -18,9 +18,9 @@ const H = Math.round(W * 0.95);
 const OUT = new URL("../previews/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
 
-function cell(params: unknown, seed: number, label: string): SheetCell {
+function cell(params: unknown, seed: number, label: string, view: Partial<RenderOptions> = {}): SheetCell {
   const { entity, stats } = GENERATE(params as never, seededRandom(seed), label);
-  const render = renderEntity(entity, { width: W, height: H, yawDeg: 38, pitchDeg: 18 });
+  const render = renderEntity(entity, { width: W, height: H, yawDeg: 38, pitchDeg: 18, ...view });
   console.log(
     `  ${label.padEnd(20)} ${String(stats.total).padStart(7)} vox ` +
       `${entity.model.size.x}x${entity.model.size.y}x${entity.model.size.z} ${stats.windows} win ${stats.ms.toFixed(0)}+${render.ms.toFixed(0)} ms`,
@@ -51,6 +51,14 @@ if (round === "species") {
   }
   for (const roof of ["tile", "slate", "thatch", "shingle"]) {
     const p = clone(PRESETS.farmhouse); p.look.roofStyle = roof; cells.push(cell(p, 21, roof));
+  }
+} else if (round === "closeup") {
+  // Facade details at a distance a player would see them: aimed at the door.
+  title = "front door close-ups";
+  for (const name of PRESET_NAMES) {
+    const { entity } = GENERATE(PRESETS[name] as never, seededRandom(21), name);
+    const { y, z } = entity.model.size;
+    cells.push(cell(PRESETS[name], 21, name, { yawDeg: 22, pitchDeg: 10, zoom: 0.42, aimY: 0, aimOffset: [0, Math.min(18, y * 0.2), z * 0.35] }));
   }
 } else if (round === "seeds") {
   cols = 3;
