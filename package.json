@@ -1,0 +1,16 @@
+{
+  "name": "@voxolith/generators",
+  "private": true,
+  "type": "module",
+  "description": "Pluggable entity generators for the Voxolith voxel engine. Each folder publishes its own package.",
+  "workspaces": [
+    "tree",
+    "bush",
+    "grass"
+  ],
+  "scripts": {
+    "typecheck": "bun run --filter '*' typecheck",
+    "verify": "bun run --filter '*' verify",
+    "preview": "bun run --filter '*' preview"
+  }
+}

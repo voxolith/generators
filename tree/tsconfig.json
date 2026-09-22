@@ -1,5 +1,5 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     // Headless packages: no WebGPU or Vite ambient types, but node: imports
     // (zlib in the preview PNG writer) must resolve.

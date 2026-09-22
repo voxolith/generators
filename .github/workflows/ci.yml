@@ -1,8 +1,8 @@
 name: CI
 
-# This package depends on its siblings through bun's "workspace:*", so a bare
-# clone cannot resolve them. They are checked out alongside and a throwaway
-# workspace root assembled, the same way the app repos build for Pages.
+# One repo, three packages. Siblings are checked out alongside because the
+# generators depend on them through "workspace:*", which only resolves inside a
+# workspace root — so the job assembles a throwaway one.
 
 on:
   push:
@@ -10,12 +10,12 @@ on:
   pull_request:
 
 jobs:
-  typecheck:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          path: gen-grass
+          path: generators
       - uses: actions/checkout@v4
         with:
           repository: voxolith/engine
@@ -30,9 +30,8 @@ jobs:
       - name: Assemble a workspace root
         run: |
           cat > package.json <<'JSON'
-          { "name": "ci-workspace", "private": true, "workspaces": ["gen-grass", "engine", "renderer"] }
+          { "name": "ci-workspace", "private": true, "workspaces": ["generators/*", "engine", "renderer"] }
           JSON
       - run: bun install
-      - run: bun run --cwd gen-grass typecheck
-      - name: Headless generator checks
-        run: bun run --cwd gen-grass verify
+      - run: bun run --cwd generators typecheck
+      - run: bun run --cwd generators verify

@@ -1,8 +1,0 @@
-node_modules/
-dist/
-*.local
-.DS_Store
-.idea/
-bun.lock
-previews/
-out/

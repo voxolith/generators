@@ -1,0 +1,72 @@
+name: Publish to npm
+
+# Publishes one package when a tag of the form <pkg>-v1.2.3 is pushed, e.g.
+# tree-v0.2.0 publishes @voxolith/gen-tree. The version must match that
+# package's package.json. Needs the NPM_TOKEN repository secret (an npm
+# automation token with publish rights on the @voxolith scope).
+#
+# Per-package tags rather than one repo-wide version: the three generators are
+# separate packages with separate release cadences, and a shared version would
+# force a release of all three whenever one changed.
+
+on:
+  push:
+    tags: ["tree-v*", "bush-v*", "grass-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: generators
+      - uses: actions/checkout@v4
+        with:
+          repository: voxolith/engine
+          path: engine
+      - uses: actions/checkout@v4
+        with:
+          repository: voxolith/renderer
+          path: renderer
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Work out which package the tag is for
+        id: pkg
+        run: |
+          name="${GITHUB_REF_NAME%%-v*}"
+          case "$name" in
+            tree|bush|grass) ;;
+            *) echo "Tag $GITHUB_REF_NAME does not name a package" >&2; exit 1 ;;
+          esac
+          echo "dir=generators/$name" >> "$GITHUB_OUTPUT"
+          echo "version=${GITHUB_REF_NAME#*-v}" >> "$GITHUB_OUTPUT"
+      - name: Assemble a workspace root
+        run: |
+          cat > package.json <<'JSON'
+          { "name": "publish-workspace", "private": true, "workspaces": ["generators/*", "engine", "renderer"] }
+          JSON
+      - run: bun install
+      - run: bun run --cwd ${{ steps.pkg.outputs.dir }} typecheck
+      - run: bun run --cwd ${{ steps.pkg.outputs.dir }} verify
+      - name: Check the tag matches package.json
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        run: |
+          pkg="$(jq -r .version package.json)"
+          if [ "$pkg" != "${{ steps.pkg.outputs.version }}" ]; then
+            echo "Tag says ${{ steps.pkg.outputs.version }}, package.json says $pkg" >&2
+            exit 1
+          fi
+      - name: Publish
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bun publish --access public
+      - name: GitHub release
+        working-directory: generators
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes
