@@ -1,8 +1,9 @@
 // Headless checks for the grass generator. No GPU.  bun tools/verify.ts
 
 import { seededRandom } from "@voxolith/renderer/core";
+import { decodeState, encodeState, generateFromState, getGenerator } from "@voxolith/engine";
 import { entityToVox } from "@voxolith/engine/vox";
-import { generateGrass, PRESETS, PRESET_NAMES } from "../src/index";
+import { generateGrass, PRESETS, PRESET_NAMES, registerGrassGenerators } from "../src/index";
 
 let failures = 0;
 const ok = (c: boolean, m: string) => {
@@ -81,6 +82,25 @@ console.log("vox export:");
   const { entity } = generateGrass(PRESETS.reeds, seededRandom(11));
   const buf = entityToVox(entity);
   ok(new TextDecoder().decode(new Uint8Array(buf, 0, 4)) === "VOX ", `reeds exports ${(buf.byteLength / 1024).toFixed(0)} KB of .vox`);
+}
+
+console.log("share codes:");
+{
+  // Every generator this package registers has to survive a round trip: the
+  // viewer builds its UI and its share codes straight off the registry.
+  registerGrassGenerators();
+  for (const id of ["voxolith/grass", "voxolith/meadow", "voxolith/fern"]) {
+    const gen = getGenerator(id)!;
+    const code = encodeState(gen as never, { seed: 4242, params: PRESETS.grass });
+    const back = decodeState(code);
+    ok(back.generator === id && back.seed === 4242, `${id} round-trips its id and seed`);
+    const a = generateFromState(decodeState(code));
+    const b = generateFromState(decodeState(code));
+    ok(
+      a.model.data.length === b.model.data.length && a.model.data.every((v, i) => v === b.model.data[i]),
+      `  ${id} rebuilds byte-identical voxels`,
+    );
+  }
 }
 
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nALL CHECKS PASSED");
