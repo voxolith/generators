@@ -6,7 +6,7 @@
 // weight. Unlike a tree, the result is deliberately many pieces — it is ground
 // cover, and each blade only has to reach the ground.
 //
-// Branch growth, rasterisation and noise come from @voxolith/engine/build.
+// Branch growth, rasterisation and noise come from @voxolith/gen-kit.
 
 import {
   capsule,
@@ -19,7 +19,7 @@ import {
   Volume,
   type Noise,
   type StemSeed,
-} from "@voxolith/engine/build";
+} from "@voxolith/gen-kit";
 import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
 import { buildRoles, ROLE } from "./roles";
 import { cloneParams, REFERENCE_HEIGHT, type GrassParams } from "./params";

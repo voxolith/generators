@@ -7,7 +7,7 @@
 // Lengths expressed as a ratio of `height` scale automatically. Lengths given
 // in voxels are tuned for a 192-tall tree and are scaled by height/192.
 
-import type { BranchLevel } from "@voxolith/engine/build";
+import type { BranchLevel } from "@voxolith/gen-kit";
 
 export type { BranchLevel };
 

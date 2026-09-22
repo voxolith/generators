@@ -7,7 +7,7 @@
 //
 // Voxel-space values are tuned for a 24-tall patch and scale with `height`.
 
-import type { BranchLevel } from "@voxolith/engine/build";
+import type { BranchLevel } from "@voxolith/gen-kit";
 
 export type { BranchLevel };
 

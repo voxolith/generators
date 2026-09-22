@@ -1,6 +1,6 @@
 // Tunables for rocks.
 //
-// A rock is a displaced superellipsoid — see @voxolith/engine/build blob — and
+// A rock is a displaced superellipsoid — see @voxolith/gen-kit blob — and
 // almost everything about how it reads comes from three numbers: how boxy the
 // mass is, how rough its surface is, and how it is banded. Everything else is
 // dressing applied to the surface afterwards.

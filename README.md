@@ -8,12 +8,13 @@
 # Voxolith generators
 
 Pluggable entity generators for [Voxolith](https://github.com/voxolith/engine). Each folder is its
-own npm package; they live together because they share a pipeline — `growBranches`,
-`placeClusters`, `carveCanopy` and `shadeByExposure` from `@voxolith/engine/build` — and are almost
-always changed together.
+own npm package; they live together because they share an authoring toolkit,
+[`kit/`](kit), and are almost always changed together. Generators *bake* models; the engine only
+places and streams them and the renderer draws them.
 
 | folder | package | what it makes |
 |---|---|---|
+| [`kit/`](kit) | [`@voxolith/gen-kit`](https://www.npmjs.com/package/@voxolith/gen-kit) | the shared toolkit and the headless preview renderer |
 | [`tree/`](tree) | [`@voxolith/gen-tree`](https://www.npmjs.com/package/@voxolith/gen-tree) | broadleaf and conifer trees |
 | [`bush/`](bush) | [`@voxolith/gen-bush`](https://www.npmjs.com/package/@voxolith/gen-bush) | shrubs, thickets, brambles, hedges |
 | [`grass/`](grass) | [`@voxolith/gen-grass`](https://www.npmjs.com/package/@voxolith/gen-grass) | grass, meadow, reeds, ferns |
@@ -38,16 +39,17 @@ root that lists all three — or use the [workspace layout](https://github.com/v
 them for you.
 
 ```sh
-bun run typecheck        # all three
+bun run typecheck        # every package
 bun run verify           # headless checks: connectivity, determinism, share codes
 bun run --cwd tree preview species   # contact sheets into tree/previews/
 ```
 
 ## Releasing
 
-Tags are per package: `tree-v0.2.0` publishes `@voxolith/gen-tree`. The version in the tag must
-match that package's `package.json`. Three packages with separate cadences, rather than one shared
-version that would force a release of all three whenever one changed.
+Tags are per package: `tree-v0.2.0` publishes `@voxolith/gen-tree`, `kit-v0.1.0` publishes
+`@voxolith/gen-kit`. The version in the tag must match that package's `package.json`. Separate
+cadences, rather than one shared version that would force a release of every package whenever one
+changed. Publish `kit` before a generator release that needs a new kit.
 
 ## Licence
 

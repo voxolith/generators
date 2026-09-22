@@ -7,7 +7,7 @@
 // for weathering and moss. Everything random — which window positions are
 // skipped, which glow, where the door sits — comes from the injected rng.
 
-import { boxFill, makeNoise, Volume, type Noise } from "@voxolith/engine/build";
+import { boxFill, makeNoise, Volume, type Noise } from "@voxolith/gen-kit";
 import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
 import { buildRoles, ROLE } from "./roles";
 import { cloneParams, type BuildingParams } from "./params";

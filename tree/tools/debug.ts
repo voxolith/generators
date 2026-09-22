@@ -2,7 +2,7 @@
 //   bun tools/debug.ts [preset] [seed]
 
 import { seededRandom } from "@voxolith/renderer/core";
-import { makeNoise } from "@voxolith/engine/build";
+import { makeNoise } from "@voxolith/gen-kit";
 import { PRESETS } from "../src/index";
 import { cloneParams } from "../src/params";
 import { applyAgeAndHealth } from "../src/season";

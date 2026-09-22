@@ -5,9 +5,9 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "repository": { "type": "git", "url": "git+https://github.com/voxolith/gen-bush.git" },
-  "homepage": "https://github.com/voxolith/gen-bush#readme",
-  "bugs": "https://github.com/voxolith/gen-bush/issues",
+  "repository": { "type": "git", "url": "git+https://github.com/voxolith/generators.git", "directory": "bush" },
+  "homepage": "https://github.com/voxolith/generators/tree/main/bush#readme",
+  "bugs": "https://github.com/voxolith/generators/issues",
   "keywords": ["voxel", "bush", "shrub", "thicket", "procedural", "generator", "voxolith"],
   "files": ["src", "README.md", "LICENSE"],
   "exports": { ".": "./src/index.ts" },
@@ -18,6 +18,6 @@
     "preview": "bun tools/preview.ts",
     "gen": "bun tools/gen.ts"
   },
-  "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/renderer": "workspace:*" },
+  "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/gen-kit": "workspace:*", "@voxolith/renderer": "workspace:*" },
   "devDependencies": { "@types/node": "^26.6.2", "typescript": "^7.0.2" }
 }

@@ -1,7 +1,7 @@
 // @voxolith/gen-bush — procedural voxel shrubs.
 //
 // Shares the branching, clump placement and canopy shaping in
-// @voxolith/engine/build with the tree generator; what differs is the base. A
+// @voxolith/gen-kit with the tree generator; what differs is the base. A
 // bush has no trunk: several stems leave the ground together and lean outward,
 // and a thicket scatters more clumps of them around the centre.
 
@@ -19,7 +19,7 @@ import {
   Volume,
   type ClusterResult,
   type ClusterSpot,
-} from "@voxolith/engine/build";
+} from "@voxolith/gen-kit";
 import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
 import { buildRoles, isLeaf, isWood, ROLE } from "./roles";
 import { cloneParams, REFERENCE_HEIGHT, type BushParams } from "./params";

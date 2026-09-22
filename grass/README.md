@@ -31,7 +31,7 @@ Unlike a tree, the result is deliberately many pieces; the guarantee is that
 every blade reaches the ground.
 
 Branch growth, clump placement, canopy carving and exposure shading come from
-[`@voxolith/engine/build`](https://github.com/voxolith/engine), shared with the
+[`@voxolith/gen-kit`](../kit), shared with the
 tree and grass generators. Generation is pure and deterministic, touches no
 filesystem, and returns an `Entity` whose voxels are colour role indices.
 

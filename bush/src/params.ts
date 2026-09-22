@@ -9,7 +9,7 @@
 // only decides which role each one gets. Voxel-space values are tuned for a
 // 64-tall bush and scale with `height`.
 
-import type { BranchLevel } from "@voxolith/engine/build";
+import type { BranchLevel } from "@voxolith/gen-kit";
 
 export type { BranchLevel };
 

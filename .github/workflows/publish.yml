@@ -39,7 +39,7 @@ jobs:
         run: |
           name="${GITHUB_REF_NAME%%-v*}"
           case "$name" in
-            tree|bush|grass|rock|building) ;;
+            kit|tree|bush|grass|rock|building) ;;
             *) echo "Tag $GITHUB_REF_NAME does not name a package" >&2; exit 1 ;;
           esac
           echo "dir=generators/$name" >> "$GITHUB_OUTPUT"

@@ -1,6 +1,6 @@
 name: CI
 
-# One repo, three packages. Siblings are checked out alongside because the
+# One repo, several packages. Siblings are checked out alongside because the
 # generators depend on them through "workspace:*", which only resolves inside a
 # workspace root — so the job assembles a throwaway one.
 

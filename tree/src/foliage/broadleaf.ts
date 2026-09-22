@@ -13,7 +13,7 @@ import {
   type Noise,
   type Skeleton,
   type Volume,
-} from "@voxolith/engine/build";
+} from "@voxolith/gen-kit";
 import type { Vec3 } from "@voxolith/engine";
 import { ROLE } from "../roles";
 import type { FoliageParams, ShapeParams } from "../params";

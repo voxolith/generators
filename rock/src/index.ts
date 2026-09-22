@@ -9,7 +9,7 @@
 // Interior voxels are left as the mid tone; the renderer never sees them, but a
 // game that breaks a rock open will.
 
-import { blob, facet, makeNoise, Volume, type Noise } from "@voxolith/engine/build";
+import { blob, facet, makeNoise, Volume, type Noise } from "@voxolith/gen-kit";
 import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
 import { buildRoles, ROLE } from "./roles";
 import { cloneParams, type RockParams } from "./params";

@@ -26,7 +26,7 @@ Presets: `bush`, `thicket`, `bramble` (long arching canes, thorns, berries),
 bare in winter and take snow, the hedge stays green.
 
 Branch growth, clump placement, canopy carving and exposure shading come from
-[`@voxolith/engine/build`](https://github.com/voxolith/engine), shared with the
+[`@voxolith/gen-kit`](../kit), shared with the
 tree and grass generators. Generation is pure and deterministic, touches no
 filesystem, and returns an `Entity` whose voxels are colour role indices.
 

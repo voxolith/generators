@@ -14,7 +14,7 @@ import {
   type Skeleton,
   type StemSeed,
   type Volume,
-} from "@voxolith/engine/build";
+} from "@voxolith/gen-kit";
 import type { Vec3 } from "@voxolith/engine";
 import { isWood, ROLE } from "./roles";
 import type { LookParams, ShapeParams } from "./params";

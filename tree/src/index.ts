@@ -6,7 +6,7 @@
 // anything that ended up disconnected so the result is always a single piece.
 //
 // The generic parts — branch growth, clump placement, canopy carving and
-// exposure shading — live in @voxolith/engine/build and are shared with the
+// exposure shading — live in @voxolith/gen-kit and are shared with the
 // other vegetation generators.
 
 import {
@@ -20,7 +20,7 @@ import {
   Volume,
   type BranchParams,
   type ClusterResult,
-} from "@voxolith/engine/build";
+} from "@voxolith/gen-kit";
 import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
 import { paintBark } from "./bark";
 import { placeBroadleafClusters } from "./foliage/broadleaf";

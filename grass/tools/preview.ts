@@ -3,7 +3,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { seededRandom } from "@voxolith/renderer/core";
-import { contactSheet, encodePng, renderEntity, type SheetCell } from "@voxolith/engine/preview";
+import { contactSheet, encodePng, renderEntity, type SheetCell } from "@voxolith/gen-kit/preview";
 import { PRESETS, PRESET_NAMES } from "../src/index";
 import { GENERATE } from "./shared";
 

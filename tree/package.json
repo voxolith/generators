@@ -5,9 +5,9 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "repository": { "type": "git", "url": "git+https://github.com/voxolith/gen-tree.git" },
-  "homepage": "https://github.com/voxolith/gen-tree#readme",
-  "bugs": "https://github.com/voxolith/gen-tree/issues",
+  "repository": { "type": "git", "url": "git+https://github.com/voxolith/generators.git", "directory": "tree" },
+  "homepage": "https://github.com/voxolith/generators/tree/main/tree#readme",
+  "bugs": "https://github.com/voxolith/generators/issues",
   "keywords": ["voxel", "tree", "procedural", "generator", "speedtree", "voxolith"],
   "files": ["src", "README.md", "LICENSE"],
   "exports": { ".": "./src/index.ts" },
@@ -18,6 +18,6 @@
     "preview": "bun tools/preview.ts",
     "gen": "bun tools/gen.ts"
   },
-  "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/renderer": "workspace:*" },
+  "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/gen-kit": "workspace:*", "@voxolith/renderer": "workspace:*" },
   "devDependencies": { "@types/node": "^26.6.2", "typescript": "^7.0.2" }
 }

@@ -5,7 +5,7 @@
 // skeleton. Winter is the exception — a bare broadleaf needs finer, denser
 // twigs or it reads as a coat rack, and it gains a snow skin.
 
-import { hash01, type Noise, type Volume } from "@voxolith/engine/build";
+import { hash01, type Noise, type Volume } from "@voxolith/gen-kit";
 import { isLeaf, isWood, ROLE } from "./roles";
 import type { LookParams, ShapeParams, SpeciesKind } from "./params";
 

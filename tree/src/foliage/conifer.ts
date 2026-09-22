@@ -4,7 +4,7 @@
 // jittered cone, and the gaps between whorls are protected. Those gaps are the
 // spruce read — let the plates merge and you get a green traffic cone.
 
-import { capsule, type ClusterResult, type Noise, type Skeleton, type Volume } from "@voxolith/engine/build";
+import { capsule, type ClusterResult, type Noise, type Skeleton, type Volume } from "@voxolith/gen-kit";
 import type { Vec3 } from "@voxolith/engine";
 import { ROLE } from "../roles";
 import type { FoliageParams, ShapeParams } from "../params";

@@ -7,7 +7,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { seededRandom } from "@voxolith/renderer/core";
-import { contactSheet, encodePng, renderEntity, type RenderOptions, type SheetCell } from "@voxolith/engine/preview";
+import { contactSheet, encodePng, renderEntity, type RenderOptions, type SheetCell } from "@voxolith/gen-kit/preview";
 import { generateTree, PRESETS } from "../src/index";
 import { cloneParams, type TreeParams } from "../src/params";
 

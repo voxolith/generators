@@ -10,7 +10,7 @@
 // constant in voxels as the trunk tapers. That single detail is what makes
 // bark read as texture at this resolution rather than as noise.
 
-import { segmentFrames, type Noise, type Skeleton, type Volume } from "@voxolith/engine/build";
+import { segmentFrames, type Noise, type Skeleton, type Volume } from "@voxolith/gen-kit";
 import type { Vec3 } from "@voxolith/engine";
 import { isWood, ROLE } from "./roles";
 import type { LookParams, ShapeParams } from "./params";
