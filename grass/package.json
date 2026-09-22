@@ -1,0 +1,23 @@
+{
+  "name": "@voxolith/gen-grass",
+  "version": "0.1.0",
+  "description": "Procedural voxel ground cover for Voxolith: grass tufts, meadows, reeds and ferns",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": { "type": "git", "url": "git+https://github.com/voxolith/gen-grass.git" },
+  "homepage": "https://github.com/voxolith/gen-grass#readme",
+  "bugs": "https://github.com/voxolith/gen-grass/issues",
+  "keywords": ["voxel", "grass", "meadow", "ground-cover", "procedural", "generator", "voxolith"],
+  "files": ["src", "README.md", "LICENSE"],
+  "exports": { ".": "./src/index.ts" },
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "verify": "bun tools/verify.ts",
+    "preview": "bun tools/preview.ts",
+    "gen": "bun tools/gen.ts"
+  },
+  "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/renderer": "workspace:*" },
+  "devDependencies": { "@types/node": "^26.6.2", "typescript": "^7.0.2" }
+}
