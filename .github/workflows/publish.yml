@@ -11,7 +11,7 @@ name: Publish to npm
 
 on:
   push:
-    tags: ["tree-v*", "bush-v*", "grass-v*"]
+    tags: ["tree-v*", "bush-v*", "grass-v*", "rock-v*"]
 
 permissions:
   contents: write
@@ -39,7 +39,7 @@ jobs:
         run: |
           name="${GITHUB_REF_NAME%%-v*}"
           case "$name" in
-            tree|bush|grass) ;;
+            tree|bush|grass|rock) ;;
             *) echo "Tag $GITHUB_REF_NAME does not name a package" >&2; exit 1 ;;
           esac
           echo "dir=generators/$name" >> "$GITHUB_OUTPUT"

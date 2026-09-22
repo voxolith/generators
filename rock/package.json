@@ -1,0 +1,23 @@
+{
+  "name": "@voxolith/gen-rock",
+  "version": "0.1.0",
+  "description": "Procedural voxel rocks and boulders for Voxolith: displaced superellipsoids with strata, cracks, moss and lichen",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": { "type": "git", "url": "git+https://github.com/voxolith/generators.git", "directory": "rock" },
+  "homepage": "https://github.com/voxolith/generators/tree/main/rock#readme",
+  "bugs": "https://github.com/voxolith/generators/issues",
+  "keywords": ["voxel", "rock", "boulder", "stone", "procedural", "generator", "voxolith"],
+  "files": ["src", "README.md"],
+  "exports": { ".": "./src/index.ts" },
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "verify": "bun tools/verify.ts",
+    "preview": "bun tools/preview.ts",
+    "gen": "bun tools/gen.ts"
+  },
+  "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/renderer": "workspace:*" },
+  "devDependencies": { "@types/node": "^26.6.2", "typescript": "^7.0.2" }
+}
