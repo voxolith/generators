@@ -9,7 +9,7 @@
 // Interior voxels are left as the mid tone; the renderer never sees them, but a
 // game that breaks a rock open will.
 
-import { blob, makeNoise, Volume, type Noise } from "@voxolith/engine/build";
+import { blob, facet, makeNoise, Volume, type Noise } from "@voxolith/engine/build";
 import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
 import { buildRoles, ROLE } from "./roles";
 import { cloneParams, type RockParams } from "./params";
@@ -49,7 +49,29 @@ export function generateRock(params: RockParams, rng: () => number, id = "rock")
   // The rock's bottom sits at the volume floor; `sink` then moves the anchor up.
   const cy = ry * (1 + s.roughness);
 
-  blob(vol, { centre: [cx, cy, cz], radii: [rx, ry, rz], exponent: s.exponent, noise, roughness: s.roughness, detail: s.detail, grit: s.grit, seed: 1 }, ROLE.ROCK_MID);
+  // Each rock is shaped in its own scratch volume, then unioned in, so one rock's
+  // fracture planes never slice through its neighbour.
+  const faceId = new Uint16Array(vol.data.length);
+  const rockAt = (centre: Vec3, radii: Vec3, seed: number) => {
+    const tmp = new Volume(sx, sy, sx);
+    blob(tmp, { centre, radii, exponent: s.exponent, noise, roughness: s.roughness, detail: s.detail, grit: s.grit, seed }, ROLE.ROCK_MID);
+    if (s.facets > 0) {
+      const { planes } = facet(tmp, { centre, radii, count: Math.round(s.facets), depth: [0.06, Math.max(0.08, s.facetDepth)], rng });
+      // Tag the voxels lying on each fracture face, so the paint pass can give
+      // every break its own even tone and the planes read as planes.
+      for (let i = 0; i < tmp.data.length; i++) {
+        if (!tmp.data[i]) continue;
+        const x = i % sx, y = ((i / sx) | 0) % sy, z = (i / (sx * sy)) | 0;
+        const px = x + 0.5 - centre[0], py = y + 0.5 - centre[1], pz = z + 0.5 - centre[2];
+        for (let k = 0; k < planes.length; k++) {
+          const pl = planes[k];
+          if (pl.d - (px * pl.nx + py * pl.ny + pz * pl.nz) < 1.3) { faceId[i] = (seed * 32 + k + 1) & 0xffff; break; }
+        }
+      }
+    }
+    for (let i = 0; i < tmp.data.length; i++) if (tmp.data[i]) vol.data[i] = tmp.data[i];
+  };
+  rockAt([cx, cy, cz], [rx, ry, rz], 1);
   let rocks = 1;
 
   // Extras: placed touching the main mass, radius scaled down, sitting on the
@@ -58,17 +80,13 @@ export function generateRock(params: RockParams, rng: () => number, id = "rock")
     const k = Math.max(0.15, s.clusterScale * (1 + (rng() * 2 - 1) * s.clusterScaleVar));
     const crx = rx * k, cry = ry * k, crz = rz * k;
     const az = rng() * Math.PI * 2;
-    // Distance chosen so the small rock overlaps the big one by ~30% of its own radius.
-    const dist = (rx * Math.abs(Math.cos(az)) + rz * Math.abs(Math.sin(az))) * 0.85 + Math.max(crx, crz) * 0.55;
+    const dist = (rx * Math.abs(Math.cos(az)) + rz * Math.abs(Math.sin(az))) * 0.8 + Math.max(crx, crz) * 0.45;
     const ex = cx + Math.cos(az) * dist, ez = cz + Math.sin(az) * dist;
-    blob(vol, {
-      centre: [ex, cry * (1 + s.roughness), ez], radii: [crx, cry, crz],
-      exponent: s.exponent, noise, roughness: s.roughness, detail: s.detail, grit: s.grit, seed: 2 + i,
-    }, ROLE.ROCK_MID);
+    rockAt([ex, cry * (1 + s.roughness), ez], [crx, cry, crz], 2 + i);
     rocks++;
   }
 
-  const stats = paintSurface(vol, p, noise);
+  const stats = paintSurface(vol, p, noise, faceId);
 
   // Anchor: bottom centre, raised by `sink` so the rock sits in the ground.
   const anchor: Vec3 = [cx, Math.floor(ry * 2 * s.sink), cz];
@@ -89,7 +107,7 @@ export function generateRock(params: RockParams, rng: () => number, id = "rock")
 }
 
 /** Give every surface voxel a role. Interior stays ROCK_MID. */
-function paintSurface(vol: Volume, p: RockParams, noise: Noise): { surface: number; moss: number; cracks: number } {
+function paintSurface(vol: Volume, p: RockParams, noise: Noise, faceId: Uint16Array): { surface: number; moss: number; cracks: number } {
   const { sx, sy, sz } = vol;
   const look = p.look;
   const sxy = sx * sy;
@@ -131,6 +149,13 @@ function paintSurface(vol: Volume, p: RockParams, noise: Noise): { surface: numb
             noise.value3(x * fMottle * 2.7, y * fMottle * 2.7, z * fMottle * 2.7, 2) * 0.4 -
             0.5) * 2 * look.mottle;
         let role: number = m > 0.16 ? ROLE.ROCK_LIGHT : m < -0.16 ? ROLE.ROCK_DARK : ROLE.ROCK_MID;
+        // A fracture face is a fresh break: one even tone per face, a notch
+        // lighter than weathered stone, so each plane reads as flat.
+        const fid = faceId[i];
+        if (fid) {
+          const fh = Math.abs(Math.sin(fid * 78.233) * 43758.5453) % 1;
+          role = fh < 0.55 ? ROLE.ROCK_LIGHT : fh < 0.85 ? ROLE.ROCK_MID : ROLE.ROCK_DARK;
+        }
         // Undersides and crevices read darker: faces pointing down or enclosed.
         if (up < -0.4 || vol.neighbourhood27(x, y, z) > 21) role = ROLE.ROCK_DARK;
 
@@ -188,6 +213,8 @@ const PARAMS: ParamSpec[] = [
   { path: "shape.exponent", label: "Angularity", kind: "number", min: 1.6, max: 9, step: 0.1, group: "Shape", help: "2 is round, 4 a rounded block, 8 nearly cubic" },
   { path: "shape.roughness", label: "Roughness", kind: "number", min: 0, max: 0.4, step: 0.01, group: "Shape" },
   { path: "shape.detail", label: "Bump size", kind: "number", min: 0.5, max: 5, step: 0.1, group: "Shape" },
+  { path: "shape.facets", label: "Fractures", kind: "int", min: 0, max: 20, group: "Shape", help: "flat broken faces; 0 is a water-worn cobble" },
+  { path: "shape.facetDepth", label: "Fracture depth", kind: "number", min: 0.08, max: 0.5, step: 0.01, group: "Shape" },
   { path: "shape.grit", label: "Grit", kind: "number", min: 0, max: 2.5, step: 0.1, group: "Shape", help: "fine surface texture; breaks up terracing" },
   { path: "shape.cluster", label: "Extra rocks", kind: "int", min: 0, max: 10, group: "Shape" },
   { path: "shape.clusterScale", label: "Extra size", kind: "number", min: 0.15, max: 0.9, step: 0.01, group: "Shape" },
@@ -206,7 +233,7 @@ const PARAMS: ParamSpec[] = [
 export const rockGenerator: EntityGenerator<RockParams> = {
   id: "voxolith/rock",
   name: "Rock",
-  version: "0.1.0",
+  version: "0.2.0",
   description: "Boulder from a displaced superellipsoid: mottling, strata, cracks, moss and lichen on the surface.",
   roles: buildRoles(skinFor("granite")),
   defaults: PRESETS.boulder,

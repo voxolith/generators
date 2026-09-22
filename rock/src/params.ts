@@ -24,6 +24,13 @@ export interface ShapeParams {
   /** Fine surface grit in voxels; breaks the contour terraces on shallow slopes. */
   grit: number;
   /**
+   * Fracture planes cut into each rock. 0 leaves a water-worn cobble; 6-12 gives
+   * the flat facets and hard edges of broken stone.
+   */
+  facets: number;
+  /** Fraction of the rock each fracture removes, at most. */
+  facetDepth: number;
+  /**
    * Extra smaller rocks nestled against the main one. Each overlaps its parent
    * so the whole stays one connected piece.
    */

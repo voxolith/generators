@@ -35,7 +35,7 @@ export const BOULDER: RockParams = {
   species: "granite",
   shape: {
     size: 48, aspect: 0.8, elongation: 0.85, exponent: 2.6,
-    roughness: 0.14, detail: 1.6, grit: 0.9,
+    roughness: 0.08, detail: 1.6, grit: 0.3, facets: 9, facetDepth: 0.32,
     cluster: 0, clusterScale: 0.45, clusterScaleVar: 0.3, sink: 0.12,
   },
   look: {
@@ -53,38 +53,38 @@ const derive = (base: RockParams, species: string, patch: (p: RockParams) => voi
 
 export const SANDSTONE: RockParams = derive(BOULDER, "sandstone", (p) => {
   // Bedded, blocky, weathered flat.
-  p.shape.aspect = 0.55; p.shape.exponent = 4; p.shape.roughness = 0.09; p.shape.detail = 2.4; p.shape.grit = 0.6;
+  p.shape.aspect = 0.55; p.shape.exponent = 4; p.shape.facets = 6; p.shape.roughness = 0.06; p.shape.detail = 2.4; p.shape.grit = 0.25;
   p.look.strata = 5; p.look.strataTiltDeg = 8; p.look.strataContrast = 0.5;
   p.look.moss = 0.05; p.look.lichen = 0.1; p.look.cracks = 0.15;
 });
 
 export const BASALT: RockParams = derive(BOULDER, "basalt", (p) => {
   // Angular, near-cubic, sharp edges, little life on it.
-  p.shape.exponent = 7; p.shape.roughness = 0.07; p.shape.detail = 3; p.shape.aspect = 0.9; p.shape.grit = 0.5;
+  p.shape.exponent = 3; p.shape.facets = 14; p.shape.facetDepth = 0.38; p.shape.roughness = 0.04; p.shape.grit = 0.15; p.shape.detail = 3; p.shape.aspect = 0.9;
   p.look.mottle = 0.3; p.look.cracks = 0.4; p.look.moss = 0.08; p.look.lichen = 0.15;
 });
 
 export const LIMESTONE: RockParams = derive(BOULDER, "limestone", (p) => {
   // Pale, pitted, heavily cracked.
-  p.shape.roughness = 0.2; p.shape.detail = 2.8; p.shape.exponent = 2.2; p.shape.grit = 1.2;
+  p.shape.roughness = 0.14; p.shape.detail = 2.8; p.shape.exponent = 2.2; p.shape.facets = 8; p.shape.grit = 0.6;
   p.look.cracks = 0.55; p.look.mottle = 0.35; p.look.moss = 0.2; p.look.lichen = 0.35;
 });
 
 export const MOSSY: RockParams = derive(BOULDER, "granite", (p) => {
-  p.shape.aspect = 0.7; p.shape.roughness = 0.16;
+  p.shape.aspect = 0.7; p.shape.roughness = 0.1; p.shape.facets = 5; p.shape.facetDepth = 0.22;
   p.look.moss = 0.85; p.look.lichen = 0.3; p.look.wet = 0.25;
 });
 
 export const OUTCROP: RockParams = derive(BOULDER, "slate", (p) => {
   // A main mass with several smaller rocks tumbled against it.
   p.shape.size = 64; p.shape.aspect = 0.6; p.shape.elongation = 0.7; p.shape.exponent = 3.2;
-  p.shape.cluster = 5; p.shape.clusterScale = 0.42; p.shape.clusterScaleVar = 0.4;
+  p.shape.cluster = 5; p.shape.clusterScale = 0.42; p.shape.clusterScaleVar = 0.4; p.shape.facets = 11;
   p.look.strata = 7; p.look.strataTiltDeg = 22; p.look.strataContrast = 0.45; p.look.moss = 0.3;
 });
 
 export const PEBBLES: RockParams = derive(BOULDER, "granite", (p) => {
   p.shape.size = 22; p.shape.aspect = 0.65; p.shape.cluster = 7; p.shape.clusterScale = 0.7;
-  p.shape.clusterScaleVar = 0.4; p.shape.roughness = 0.1; p.shape.sink = 0.2; p.shape.grit = 0.5;
+  p.shape.clusterScaleVar = 0.4; p.shape.roughness = 0.1; p.shape.sink = 0.2; p.shape.facets = 0; p.shape.grit = 0.5;
   p.look.moss = 0.15; p.look.lichen = 0.1; p.look.cracks = 0.1;
 });
 
