@@ -2,9 +2,20 @@
 //   bun tools/verify.ts
 
 import { seededRandom } from "@voxolith/renderer/core";
-import { modelAt, voxelCount } from "@voxolith/engine";
+import {
+  clampToSpec,
+  decodeState,
+  encodeState,
+  fingerprint,
+  generateFromState,
+  getGenerator,
+  modelAt,
+  readParams,
+  voxelCount,
+  withParam,
+} from "@voxolith/engine";
 import { entityToVox } from "@voxolith/engine/vox";
-import { generateTree, PRESETS, PRESET_NAMES } from "../src/index";
+import { generateTree, PRESETS, PRESET_NAMES, registerTreeGenerators } from "../src/index";
 import type { Season } from "../src/params";
 
 let failures = 0;
@@ -118,6 +129,74 @@ console.log("vox export:");
   ok(buf.byteLength > 1000, `spruce exports ${(buf.byteLength / 1024).toFixed(0)} KB of .vox`);
   const magic = new TextDecoder().decode(new Uint8Array(buf, 0, 4));
   ok(magic === "VOX ", "the export carries a valid .vox header");
+}
+
+console.log("share codes:");
+{
+  // A code has to rebuild the exact model, or it is not worth sharing.
+  registerTreeGenerators();
+  const gen = getGenerator("voxolith/tree.broadleaf")!;
+  const read = (o: unknown, path: string) =>
+    path.split(".").reduce<any>((c, k) => (c == null ? c : c[k]), o);
+
+  const state = { seed: 12345, params: JSON.parse(JSON.stringify(PRESETS.oak)) };
+  const code = encodeState(gen as never, state);
+  console.log(`  ${code.length}-char code, fingerprint ${fingerprint(code)}`);
+
+  const back = decodeState(code);
+  ok(back.generator === gen.id && back.seed === 12345, "a code round-trips its generator and seed");
+
+  let drift = "";
+  for (const { spec } of readParams(gen as never, state.params)) {
+    const want = String(clampToSpec(spec, read(state.params, spec.path)));
+    const got = String(read(back.params, spec.path));
+    if (want !== got) drift ||= `${spec.path}: ${want} -> ${got}`;
+  }
+  ok(!drift, "every declared parameter round-trips", drift);
+
+  // All four spec kinds, with values that are not the defaults.
+  let tweaked = JSON.parse(JSON.stringify(PRESETS.oak));
+  tweaked = withParam(tweaked, "shape.height", 171);
+  tweaked = withParam(tweaked, "shape.trunk.taperExp", 0.85);
+  tweaked = withParam(tweaked, "foliage.enabled", false);
+  tweaked = withParam(tweaked, "look.season", "autumn");
+  const t = decodeState(encodeState(gen as never, { seed: 7, params: tweaked }));
+  ok(read(t.params, "shape.height") === 171, "int survives");
+  ok(read(t.params, "shape.trunk.taperExp") === 0.85, "number survives");
+  ok(read(t.params, "foliage.enabled") === false, "bool survives");
+  ok(read(t.params, "look.season") === "autumn", "enum survives");
+
+  const a = generateFromState(decodeState(code));
+  const b = generateFromState(decodeState(code));
+  ok(
+    a.model.data.length === b.model.data.length && a.model.data.every((v, i) => v === b.model.data[i]),
+    "the same code rebuilds byte-identical voxels",
+  );
+  const other = generateFromState(decodeState(encodeState(gen as never, { seed: 999, params: PRESETS.oak })));
+  ok(
+    other.model.data.length !== a.model.data.length || !other.model.data.every((v, i) => v === a.model.data[i]),
+    "a different seed gives a different tree",
+  );
+  ok(encodeState(gen as never, state) === code, "encoding is stable across runs");
+
+  // A code written against a different parameter list must be refused, not
+  // quietly misread into a different tree.
+  const shifted = { ...gen, params: (gen.params as unknown[]).slice(1) } as never;
+  let refused = false;
+  try {
+    decodeState(encodeState(shifted, state));
+  } catch (e) {
+    refused = String(e).includes("different parameters");
+  }
+  ok(refused, "a code from a different parameter set is refused");
+
+  let rejected = false;
+  try {
+    decodeState("not a real code!!");
+  } catch {
+    rejected = true;
+  }
+  ok(rejected, "garbage is rejected");
 }
 
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nALL CHECKS PASSED");
