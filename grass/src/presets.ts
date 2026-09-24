@@ -155,7 +155,7 @@ export const FERN: GrassParams = derive(GRASS, "fern", (p) => {
   p.shape.bladesPerTuft = [5, 9];
   p.shape.fanDeg = 30;
   p.shape.fanVarDeg = 10;
-  p.shape.arc = 0.009;
+  p.shape.arc = 0.01;
   p.shape.radius = 0.7;
   p.shape.segLen = 1.6;
   p.shape.levels = [

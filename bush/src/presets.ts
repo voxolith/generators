@@ -131,7 +131,7 @@ export const BUSH: BushParams = {
   },
   look: {
     season: "summer",
-    health: 0.92,
+    health: 0.9,
     accentFraction: 0.06,
     berryFraction: 0,
     blossom: 0.2,

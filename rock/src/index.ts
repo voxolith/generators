@@ -89,7 +89,10 @@ export function generateRock(params: RockParams, rng: () => number, id = "rock")
   const stats = paintSurface(vol, p, noise, faceId);
 
   // Anchor: bottom centre, raised by `sink` so the rock sits in the ground.
-  const anchor: Vec3 = [cx, Math.floor(ry * 2 * s.sink), cz];
+  // Measured from the rock's real bottom: noise can lift it off the volume
+  // floor, and an anchor below the model would place it floating.
+  const bottom = vol.bounds()?.y0 ?? 0;
+  const anchor: Vec3 = [cx, bottom + Math.floor(ry * 2 * s.sink), cz];
   const model = vol.crop(anchor, buildRoles(skinFor(p.species)));
 
   let total = 0;
@@ -233,7 +236,7 @@ const PARAMS: ParamSpec[] = [
 export const rockGenerator: EntityGenerator<RockParams> = {
   id: "voxolith/rock",
   name: "Rock",
-  version: "0.2.0",
+  version: "0.2.1",
   description: "Boulder from a displaced superellipsoid: mottling, strata, cracks, moss and lichen on the surface.",
   roles: buildRoles(skinFor("granite")),
   defaults: PRESETS.boulder,

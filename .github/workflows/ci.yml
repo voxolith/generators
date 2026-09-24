@@ -35,3 +35,5 @@ jobs:
       - run: bun install
       - run: bun run --cwd generators typecheck
       - run: bun run --cwd generators verify
+      # Every generator at every parameter extreme against the EntityGenerator contract.
+      - run: bun run --cwd generators/contract full

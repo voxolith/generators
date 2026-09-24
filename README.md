@@ -45,6 +45,23 @@ bun run verify           # headless checks: connectivity, determinism, share cod
 bun run --cwd tree preview species   # contact sheets into tree/previews/
 ```
 
+## The contract
+
+[`contract/`](contract) (private, not published) checks every registered generator against
+what the engine relies on: namespaced id and semver version, unique roles with colours in
+0..1, defaults inside their own ParamSpecs, the same seed giving the same voxels (even after
+other calls), params never mutated, voxel values within the declared roles, the anchor inside
+the model, nothing floating (every voxel connected to the base), share codes rebuilding the
+same model, and every parameter at its min, max and each enum option still generating.
+
+```sh
+bun run --cwd contract verify    # quick: defaults only (part of `bun run check`)
+bun run --cwd contract full      # every parameter extreme (CI)
+```
+
+`gen-terrain` is not an entity generator and is not covered: it describes a region (a
+heightfield and water), takes a seed rather than an rng, and has its own checks.
+
 ## Releasing
 
 Tags are per package: `tree-v0.2.0` publishes `@voxolith/gen-tree`, `kit-v0.1.0` publishes

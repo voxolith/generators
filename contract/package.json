@@ -1,0 +1,22 @@
+{
+  "name": "@voxolith/generators-contract",
+  "private": true,
+  "type": "module",
+  "description": "The EntityGenerator contract, checked for every generator in this repo (not published)",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "verify": "bun tools/contract.ts --quick",
+    "full": "bun tools/contract.ts"
+  },
+  "devDependencies": {
+    "@voxolith/engine": "workspace:*",
+    "@voxolith/renderer": "workspace:*",
+    "@voxolith/gen-tree": "workspace:*",
+    "@voxolith/gen-bush": "workspace:*",
+    "@voxolith/gen-grass": "workspace:*",
+    "@voxolith/gen-rock": "workspace:*",
+    "@voxolith/gen-building": "workspace:*",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  }
+}
