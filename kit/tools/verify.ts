@@ -1,7 +1,7 @@
 // Headless checks for the toolkit. No GPU.  bun tools/verify.ts
 
 import { seededRandom } from "@voxolith/renderer/core";
-import { blob, capsule, facet, line3, makeNoise, Volume } from "../src/index";
+import { blob, capsule, facet, line3, makeNoise, RiggedVolume, Volume } from "../src/index";
 import { renderEntity } from "../src/preview/index";
 
 let failures = 0;
@@ -51,6 +51,24 @@ console.log("masses:");
   const { removed, planes } = facet(vol, { centre: [24, 18, 24], radii: [16, 12, 14], count: 5, depth: [0.1, 0.3], rng });
   ok(before > 1000 && removed > 0 && planes.length === 5, `blob ${before} voxels, facet removed ${removed} along ${planes.length} planes`);
   ok(oneComponent(vol), "a faceted blob stays one piece");
+}
+
+console.log("rigs:");
+{
+  const r = new RiggedVolume(40, 20, 20);
+  const body = r.bone("body", null, [5, 10, 10], [25, 10, 10]);
+  const leg = r.bone("leg", "body", [25, 10, 10], [35, 10, 10]);
+  r.capsule(body, [5, 10, 10], [25, 10, 10], 6, 6, 1);
+  r.capsule(leg, [25, 10, 10], [35, 10, 10], 3, 2, 1);
+  const own = (x: number, y: number, z: number) => r.owner[r.vol.index(x, y, z)];
+  ok(own(10, 10, 10) === body && own(32, 10, 10) === leg && own(25, 10, 10) === leg, "voxels belong to the bone that filled them last (the joint goes to the child)");
+  const depth = r.layerInterior([7, 8, 9]);
+  ok(r.vol.get(10, 10, 4) === 7 && r.vol.get(10, 10, 5) === 8 && r.vol.get(10, 10, 10) === 9, "layers follow depth below the surface: skin, then the next layer, then the core");
+  ok(depth[r.vol.index(10, 10, 10)] >= 5, "depth counts voxels to the nearest air");
+  const { model, rig } = r.crop([5, 4, 10], [1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => ({ id: `r${i}`, name: `R${i}`, color: [0.5, 0.5, 0.5] as [number, number, number] })));
+  const b = r.vol.bounds()!;
+  ok(!!model.bones && model.bones.length === model.data.length, "the crop carries the bone binding");
+  ok(rig.bones[1].head[0] === 25 - b.x0 && rig.bones[1].parent === 0, "and moves the rig into the same space");
 }
 
 console.log("preview:");

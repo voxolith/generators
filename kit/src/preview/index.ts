@@ -11,3 +11,5 @@ export type { SheetCell, SheetOptions } from "./sheet";
 
 export { encodePng } from "./png";
 export { drawText, textWidth } from "./font";
+
+export { cutAway } from "./cut";

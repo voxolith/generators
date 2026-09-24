@@ -28,12 +28,15 @@ import { registerBushGenerators } from "@voxolith/gen-bush";
 import { registerGrassGenerators } from "@voxolith/gen-grass";
 import { registerRockGenerators } from "@voxolith/gen-rock";
 import { registerBuildingGenerators } from "@voxolith/gen-building";
+import { registerCreatureGenerators } from "@voxolith/gen-creature";
+import { bakePose, poseMatrices, sampleClip } from "@voxolith/engine/animation";
 
 registerTreeGenerators();
 registerBushGenerators();
 registerGrassGenerators();
 registerRockGenerators();
 registerBuildingGenerators();
+registerCreatureGenerators();
 
 const quick = process.argv.includes("--quick");
 let failed = 0, checks = 0;
@@ -82,6 +85,26 @@ function grounded(e: Entity): number {
   return total ? reached / total : 1;
 }
 
+/** Largest 6-connected component as a fraction of solid voxels (a jumping pose need not touch the ground). */
+function largestPart(m: Entity["model"]): number {
+  const { x: sx, y: sy } = m.size, sxy = sx * sy, d = m.data;
+  const seen = new Uint8Array(d.length);
+  let best = 0, total = 0;
+  for (let i = 0; i < d.length; i++) if (d[i]) total++;
+  for (let i = 0; i < d.length; i++) {
+    if (!d[i] || seen[i]) continue;
+    const st = [i]; seen[i] = 1; let n = 0;
+    while (st.length) {
+      const j = st.pop()!; n++;
+      const x = j % sx, y = ((j / sx) | 0) % sy, z = (j / sxy) | 0;
+      for (const [k, inb] of [[j - 1, x > 0], [j + 1, x < sx - 1], [j - sx, y > 0], [j + sx, y < sy - 1], [j - sxy, z > 0], [j + sxy, z < m.size.z - 1]] as const)
+        if (inb && d[k] && !seen[k]) { seen[k] = 1; st.push(k); }
+    }
+    best = Math.max(best, n);
+  }
+  return total ? best / total : 1;
+}
+
 function checkEntity(gen: EntityGenerator<unknown>, e: Entity, label: string, minGrounded: number) {
   const { x, y, z } = e.model.size;
   ok(e.model.data.length === x * y * z, `${label}: data matches size`);
@@ -128,6 +151,34 @@ for (const gen of listGenerators()) {
   gen.generate(passed, seededRandom(5));
   ok(JSON.stringify(passed) === before && JSON.stringify(gen.defaults) === before, "generate does not mutate its params or the defaults");
   checkEntity(gen, a, "defaults", 0.999);
+
+  // Rigged generators: the rig and clips must be usable by the engine.
+  if (a.rig) {
+    const rig = a.rig, n = rig.bones.length, m = a.model;
+    ok(n > 0 && n <= 255, "a rig has 1..255 bones", `${n}`);
+    ok(rig.bones.every((b, i) => b.parent < i && b.parent >= -1), "bones are ordered parents first");
+    ok(new Set(rig.bones.map((b) => b.id)).size === n, "bone ids are unique");
+    ok(!!m.bones && m.bones.length === m.data.length, "the model binds every voxel to a bone");
+    if (m.bones) {
+      let bad = 0;
+      for (let i = 0; i < m.data.length; i++) if (m.data[i] && m.bones[i] >= n) bad++;
+      ok(bad === 0, "every bone binding names a real bone", `${bad} voxels`);
+    }
+    for (const clip of a.clips ?? []) {
+      const tracksOk = clip.tracks.every((t) => t.bone >= 0 && t.bone < n && t.times.length > 0 && t.times[0] === 0 &&
+        t.times.every((v, i) => i === 0 || v > t.times[i - 1]) && t.rotations.length === t.times.length * 4 &&
+        t.times.every((_, k) => Math.abs(Math.hypot(t.rotations[k * 4], t.rotations[k * 4 + 1], t.rotations[k * 4 + 2], t.rotations[k * 4 + 3]) - 1) < 1e-3));
+      ok(tracksOk, `clip ${clip.id}: tracks name real bones, times ascend from 0, rotations are unit quaternions`);
+      if (clip.loop) {
+        const s0 = sampleClip(clip, 0, n).rotations, s1 = sampleClip(clip, clip.duration - 1e-6, n).rotations;
+        ok(s0.every((v, i) => Math.abs(Math.abs(v) - Math.abs(s1[i])) < 2e-3), `clip ${clip.id}: the loop closes`);
+      }
+      const mid = bakePose(m, rig, poseMatrices(rig, sampleClip(clip, clip.duration * 0.4, n)));
+      const g = grounded({ ...a, model: mid });
+      const c = largestPart(mid);
+      ok(c >= 0.98, `clip ${clip.id}: a mid-clip pose stays in one piece`, `${(c * 100).toFixed(1)}% (grounded ${(g * 100).toFixed(1)}%)`);
+    }
+  }
 
   // Share codes rebuild the same model.
   const code = encodeState(gen, { seed: 4242, params: gen.defaults });

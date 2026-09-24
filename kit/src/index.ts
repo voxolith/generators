@@ -42,4 +42,5 @@ export { placeClusters, spotsAlong } from "./cluster";
 export type { ClusterOptions, ClusterResult, ClusterSpot } from "./cluster";
 
 export { blob, facet } from "./blob";
+export { RiggedVolume } from "./rig";
 export type { BlobOptions, FacetOptions, FacetPlane } from "./blob";
