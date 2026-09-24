@@ -58,6 +58,29 @@ console.log("river:");
   ok(best > W / 2, `one body of water spans ${best} of ${W} columns — a river, not puddles`);
 }
 
+console.log("river width:");
+{
+  // Local width at each wet column: the shorter of its horizontal and
+  // vertical water runs (a run along a diagonal river overstates both, the
+  // shorter one less). The spread between narrows and pools is p90 / p10.
+  const widths = (variation: number) => {
+    const r = generateTerrain({ width: 640, depth: 640, river: { ...DEFAULT_TERRAIN.river, widthVariation: variation } }, 7);
+    const run = (x: number, z: number, dx: number, dz: number) => {
+      let n = 1;
+      for (let s = 1; s < 80 && r.waterAt(x + dx * s, z + dz * s); s++) n++;
+      for (let s = 1; s < 80 && r.waterAt(x - dx * s, z - dz * s); s++) n++;
+      return n;
+    };
+    const out: number[] = [];
+    for (let z = 4; z < 636; z += 6) for (let x = 4; x < 636; x += 6) if (r.waterAt(x, z)) out.push(Math.min(run(x, z, 1, 0), run(x, z, 0, 1)));
+    out.sort((a, b) => a - b);
+    const q = (f: number) => out[Math.floor(f * (out.length - 1))];
+    return { p10: q(0.1), p90: q(0.9), spread: q(0.9) / Math.max(1, q(0.1)) };
+  };
+  const flat = widths(0), varied = widths(0.6);
+  ok(varied.spread > flat.spread * 1.4, `the width varies along the river: narrows ${varied.p10} to pools ${varied.p90} voxels (constant width: ${flat.p10}..${flat.p90})`);
+}
+
 console.log("voxels:");
 {
   // fillBrick agrees with roleAt everywhere in a sample of bricks.

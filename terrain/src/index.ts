@@ -27,6 +27,13 @@ export interface RiverParams {
   banks: number;
   /** Distance over which the river swings from one side to the other. */
   meander: number;
+  /**
+   * How much the width varies along the river, 0 (constant) .. 1 (from a
+   * trickle to about twice as wide). Wide stretches are deeper too.
+   */
+  widthVariation?: number;
+  /** Distance over which the width changes, in voxels. */
+  widthScale?: number;
 }
 
 export interface TerrainParams {
@@ -63,7 +70,7 @@ export const DEFAULT_TERRAIN: TerrainParams = {
   featureSize: 110,
   detail: 1.5,
   waterLevel: 13,
-  river: { enabled: true, width: 16, depth: 5, banks: 18, meander: 380 },
+  river: { enabled: true, width: 16, depth: 5, banks: 18, meander: 380, widthVariation: 0.6, widthScale: 120 },
   rockSlope: 3,
   sandBand: 2,
   dryAbove: 5,
@@ -122,6 +129,16 @@ export function terrainHeight(params: TerrainParams, seed: number): (x: number, 
   const fr = 1 / Math.max(16, p.river.meander);
   const riverNoise = (x: number, z: number) => noise.fbm2(x * fr + 101.3, z * fr + 57.7, 3);
   const halfW = p.river.width / 2;
+  const vary = Math.max(0, Math.min(1, p.river.widthVariation ?? 0));
+  const fw = 1 / Math.max(16, p.river.widthScale ?? 120);
+  /** Width factor at a point: a slow field, so pools and narrows alternate along the river. */
+  const widthAt = (x: number, z: number) => {
+    if (vary <= 0) return 1;
+    // fbm mostly stays within 0.5 ± 0.15; stretch that to -1..1 so the full
+    // range is used: pools up to ~2.2× the base width, narrows ~0.6×.
+    const t = Math.max(-1, Math.min(1, (noise.fbm2(x * fw - 43.1, z * fw + 88.9, 2) - 0.5) / 0.15));
+    return 1 + vary * t * (t > 0 ? 2 : 0.65);
+  };
   return (x: number, z: number) => {
     let h = p.baseY + (noise.fbm2(x * f, z * f, 4) - 0.5) * 2.4 * p.relief;
     h += (noise.fbm2(x * f * 7 + 31, z * f * 7 - 17, 2) - 0.5) * 2 * p.detail;
@@ -133,11 +150,17 @@ export function terrainHeight(params: TerrainParams, seed: number): (x: number, 
       const gx = (riverNoise(x + 1, z) - riverNoise(x - 1, z)) / 2;
       const gz = (riverNoise(x, z + 1) - riverNoise(x, z - 1)) / 2;
       const d = Math.abs(r - 0.5) / Math.max(1e-5, Math.hypot(gx, gz));
-      if (d < halfW) {
-        const k = d / halfW;
-        h = Math.min(h, p.waterLevel - p.river.depth * (1 - k * k) - 0.5);
-      } else if (d < halfW + p.river.banks) {
-        const s = smooth((d - halfW) / p.river.banks);
+      // Width, depth and banks all follow the local width factor: a pool is
+      // wide, deep and gently shelving; a narrows is shallow with steep sides.
+      const wk = widthAt(x, z);
+      const hw = halfW * wk;
+      const banks = p.river.banks * (0.6 + 0.4 * wk);
+      const depth = p.river.depth * (0.55 + 0.45 * Math.min(wk, 1.8));
+      if (d < hw) {
+        const k = d / hw;
+        h = Math.min(h, p.waterLevel - depth * (1 - k * k) - 0.5);
+      } else if (d < hw + banks) {
+        const s = smooth((d - hw) / banks);
         h = Math.min(h, p.waterLevel + 0.6 + (h - p.waterLevel - 0.6) * s);
       }
     }
