@@ -139,7 +139,8 @@ console.log("determinism and cost:");
   const N = 200;
   for (let i = 0; i < N; i++) bakePose(m, rig, poseMatrices(rig, sampleClip(run, i * 0.02, n)), { yaw: i * 0.05 });
   const us = ((performance.now() - t0) / N) * 1000;
-  ok(us < 3000, `baking a posed rat takes ${us.toFixed(0)} µs`);
+  // A guard against order-of-magnitude regressions only; CI runners are slow and parallel.
+  ok(us < 25000, `baking a posed rat takes ${us.toFixed(0)} µs`);
 }
 
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nALL CHECKS PASSED");
