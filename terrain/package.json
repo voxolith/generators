@@ -1,0 +1,22 @@
+{
+  "name": "@voxolith/gen-terrain",
+  "version": "0.1.0",
+  "description": "Procedural voxel terrain for Voxolith: rolling hills, a meandering river and lakes, surface materials by slope and water, streamed a brick at a time",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": { "type": "git", "url": "git+https://github.com/voxolith/generators.git", "directory": "terrain" },
+  "homepage": "https://github.com/voxolith/generators/tree/main/terrain#readme",
+  "bugs": "https://github.com/voxolith/generators/issues",
+  "keywords": ["voxel", "terrain", "heightmap", "river", "procedural", "generator", "voxolith"],
+  "files": ["src", "README.md"],
+  "exports": { ".": "./src/index.ts" },
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "verify": "bun tools/verify.ts",
+    "preview": "bun tools/preview.ts"
+  },
+  "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/gen-kit": "workspace:*", "@voxolith/renderer": "workspace:*" },
+  "devDependencies": { "@types/node": "^26.6.2", "typescript": "^7.0.2" }
+}

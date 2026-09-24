@@ -20,6 +20,7 @@ places and streams them and the renderer draws them.
 | [`grass/`](grass) | [`@voxolith/gen-grass`](https://www.npmjs.com/package/@voxolith/gen-grass) | grass, meadow, reeds, ferns |
 | [`rock/`](rock) | [`@voxolith/gen-rock`](https://www.npmjs.com/package/@voxolith/gen-rock) | boulders, outcrops, pebbles |
 | [`building/`](building) | [`@voxolith/gen-building`](https://www.npmjs.com/package/@voxolith/gen-building) | cottages, farmhouses, townhouses, towers, barns |
+| [`terrain/`](terrain) | [`@voxolith/gen-terrain`](https://www.npmjs.com/package/@voxolith/gen-terrain) | hills, a meandering river and lakes, streamed a brick at a time |
 
 A generator is pure and deterministic: everything random comes from an injected rng, so the same
 parameters and seed always rebuild the same voxels. That is what lets a model be described by a

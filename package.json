@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Pluggable entity generators for the Voxolith voxel engine. Each folder publishes its own package.",
   "workspaces": [
+    "terrain",
     "kit",
     "tree",
     "bush",
