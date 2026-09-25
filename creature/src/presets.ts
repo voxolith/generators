@@ -45,3 +45,25 @@ export const PRESETS: Record<string, CreatureParams> = {
   "fat rat": derive("fat rat", (p) => { p.shape.girth = 1.3; p.shape.size = 1.15; p.gait.pace = 1.1; p.gait.bounce = 1.3; }),
 };
 export const PRESET_NAMES = Object.keys(PRESETS);
+
+/**
+ * Metres nose to tail tip of the default rat (a large brown rat), and voxels
+ * per unit of `shape.size` for the default proportions (measured: 75 voxels
+ * at 1.2). Presets are stylised game rats, larger than life; `atScale` sizes
+ * one for a world with a fixed voxels-per-metre.
+ */
+const RAT_LENGTH_M = 0.5;
+const VOXELS_PER_SIZE = 62.5;
+
+/**
+ * The same creature, sized for a world of `voxelsPerMetre` (a rat at 100
+ * vox/m comes out at size 0.8, about 50 voxels long). Presets keep their
+ * ratios to each other; sizes snap to the 0.05 grid of `shape.size` and never
+ * go below 0.7, where legs would thin to one voxel.
+ */
+export function atScale(params: CreatureParams, voxelsPerMetre: number): CreatureParams {
+  const p: CreatureParams = JSON.parse(JSON.stringify(params));
+  const factor = (RAT_LENGTH_M * voxelsPerMetre) / (VOXELS_PER_SIZE * RAT.shape.size);
+  p.shape.size = Math.max(0.7, Math.min(2, Math.round(params.shape.size * factor * 20) / 20));
+  return p;
+}

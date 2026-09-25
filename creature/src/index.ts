@@ -70,7 +70,7 @@ const PARAMS: ParamSpec[] = [
 export const creatureGenerator: EntityGenerator<CreatureParams> = {
   id: "voxolith/creature",
   name: "Creature",
-  version: "0.1.0",
+  version: "0.2.0",
   description: "Rigged, animated rat: fur over fat, flesh, bone and organs; generated walk, run, idle, sniff, turn and death clips.",
   roles: buildRoles(skinFor("brown", false, 0.7)),
   defaults: PRESETS.rat,
@@ -82,7 +82,7 @@ export function registerCreatureGenerators(): void {
   registerGenerator(creatureGenerator);
 }
 
-export { PRESETS, PRESET_NAMES, skinFor } from "./presets";
+export { PRESETS, PRESET_NAMES, skinFor, atScale } from "./presets";
 export { ROLE, ROLE_COUNT, INTERIOR, buildRoles } from "./roles";
 export { LEGS } from "./body";
 export { cloneParams } from "./params";

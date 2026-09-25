@@ -3,7 +3,7 @@
 import { seededRandom } from "@voxolith/renderer/core";
 import type { EntityModel } from "@voxolith/engine";
 import { bakePose, poseMatrices, sampleClip, sever, wound } from "@voxolith/engine/animation";
-import { generateCreature, INTERIOR, PRESETS, PRESET_NAMES, ROLE } from "../src/index";
+import { atScale, generateCreature, INTERIOR, PRESETS, PRESET_NAMES, ROLE, type CreatureParams } from "../src/index";
 
 let failures = 0;
 const ok = (c: boolean, m: string) => {
@@ -50,84 +50,106 @@ for (const name of PRESET_NAMES) {
   ok(rig.bones.every((b, i) => b.parent < i), `  ${name}: bones are ordered parents first`);
 }
 
+// The stylised preset, and the same rat at real size in a 1 cm world, where
+// it is thinnest: the resolution rules have to hold at both.
+function checkRat(params: CreatureParams, label: string): void {
+  const { entity: rat } = generateCreature(params, seededRandom(3));
+  const m = rat.model, rig = rat.rig!;
+  const n = rig.bones.length;
+
+  console.log(`inside (${label}):`);
+  {
+    const chest = rig.bones.findIndex((b) => b.id === "chest");
+    // Some cut across the chest bone shows all three.
+    let shown = false;
+    for (let z = Math.floor(rig.bones[chest].head[2]); z <= Math.ceil(rig.bones[chest].tail[2]) && !shown; z++) {
+      const found = new Set<number>();
+      for (let y = 0; y < m.size.y; y++) for (let x = 0; x < m.size.x; x++) found.add(m.data[x + y * m.size.x + z * m.size.x * m.size.y]);
+      shown = [ROLE.BONE, ROLE.FLESH, ROLE.ORGAN].every((r) => found.has(r));
+    }
+    ok(shown, "a slice through the chest shows bone, flesh and organs");
+    const head = rig.bones.findIndex((b) => b.id === "head");
+    const hz = Math.round(rig.bones[head].head[2] + 3);
+    const inHead = new Set<number>();
+    for (let y = 0; y < m.size.y; y++) for (let x = 0; x < m.size.x; x++) inHead.add(m.data[x + y * m.size.x + hz * m.size.x * m.size.y]);
+    ok(inHead.has(ROLE.BONE) && inHead.has(ROLE.ORGAN), "the head has a skull around a brain");
+  }
+
+  console.log(`clips (${label}):`);
+  {
+    const minYOf = (b: EntityModel, bone: number | null) => {
+      const { x: sx, y: sy } = b.size;
+      let lo = Infinity;
+      for (let i = 0; i < b.data.length; i++) {
+        if (!b.data[i] || (bone !== null && b.bones![i] !== bone)) continue;
+        lo = Math.min(lo, ((i / sx) | 0) % sy);
+      }
+      return lo;
+    };
+    for (const clip of rat.clips!) {
+      let worst = 1, maxExposed = 0;
+      for (let k = 0; k < 12; k++) {
+        const t = (clip.duration * k) / 12;
+        const b = bakePose(m, rig, poseMatrices(rig, sampleClip(clip, t, n)));
+        worst = Math.min(worst, largest(b));
+        let ex = 0, surf = 0;
+        for (let i = 0; i < b.data.length; i++) {
+          if (!b.data[i] || !onSurface(b, i)) continue;
+          surf++;
+          if (INTERIOR.has(b.data[i])) ex++;
+        }
+        maxExposed = Math.max(maxExposed, ex / Math.max(1, surf));
+      }
+      ok(worst > 0.985, `${clip.id}: stays one piece in every frame (worst ${(worst * 100).toFixed(1)}%)`);
+      ok(maxExposed < 0.01, `  ${clip.id}: no inside showing in any pose (worst ${(maxExposed * 100).toFixed(2)}% of the surface)`);
+      if (clip.loop) {
+        const a = sampleClip(clip, 0, n).rotations, e = sampleClip(clip, clip.duration - 1e-6, n).rotations;
+        ok(a.every((v, i) => Math.abs(Math.abs(v) - Math.abs(e[i])) < 1e-3), `  ${clip.id}: the loop closes`);
+      }
+    }
+    const walk = rat.clips!.find((c) => c.id === "walk")!;
+    let grounded = true;
+    for (const ev of walk.events ?? []) {
+      const leg = ev.name.split(".")[1];
+      const foot = rig.bones.findIndex((b) => b.id === `${leg}.foot`);
+      const b = bakePose(m, rig, poseMatrices(rig, sampleClip(walk, ev.t, n)));
+      const lowestFoot = Math.min(...["FL", "FR", "HL", "HR"].map((l) => minYOf(b, rig.bones.findIndex((x) => x.id === `${l}.foot`))));
+      if (minYOf(b, foot) > lowestFoot + 1 || minYOf(b, null) < lowestFoot - 1) grounded = false;
+    }
+    ok(grounded, "walk: each foot is down at its footfall event, and nothing hangs below the feet");
+  }
+
+  console.log(`damage (${label}):`);
+  {
+    const blood = ROLE.BLOOD;
+    const spine = rig.bones.findIndex((b) => b.id === "spine");
+    const [px, py, pz] = rig.bones[spine].head;
+    const hurt = wound(m, [px + 5, py, pz], 3, { rim: blood });
+    let inside = 0;
+    for (let i = 0; i < hurt.data.length; i++) if (hurt.data[i] && INTERIOR.has(hurt.data[i]) && onSurface(hurt, i)) inside++;
+    ok(inside > 10, `a wound in the flank shows the inside (${inside} voxels)`);
+    const tail = rig.bones.findIndex((b) => b.id === "tail2");
+    const cut = sever(m, rig, tail, { rim: blood });
+    ok(!!cut.piece && cut.piece.rig.bones.length === 5, `severing the tail at the third bone takes the rest of the tail with it (${cut.piece?.rig.bones.length} bones)`);
+    const leg = rig.bones.findIndex((b) => b.id === "HL.upper");
+    const cutLeg = sever(m, rig, leg, { rim: blood });
+    ok(!!cutLeg.piece && cutLeg.piece.rig.bones.length === 3, "a hind leg comes off whole (thigh, shin, foot)");
+  }
+}
+
+checkRat(PRESETS.rat, `size ${PRESETS.rat.shape.size}`);
+const real = atScale(PRESETS.rat, 100);
+checkRat(real, `size ${real.shape.size}, 100 vox/m`);
+ok(atScale(PRESETS.rat, 10 * 7.5).shape.size < real.shape.size && atScale(PRESETS["fat rat"], 100).shape.size <= real.shape.size, "atScale keeps presets in proportion and shrinks with coarser worlds");
+{
+  const { entity } = generateCreature(real, seededRandom(3));
+  const len = entity.model.size.z / 100;
+  ok(len > 0.4 && len < 0.6, `a rat at 100 vox/m is ${len.toFixed(2)} m nose to tail tip`);
+}
+
 const { entity: rat } = generateCreature(PRESETS.rat, seededRandom(3));
 const m = rat.model, rig = rat.rig!;
 const n = rig.bones.length;
-
-console.log("inside:");
-{
-  const chest = rig.bones.findIndex((b) => b.id === "chest");
-  const z = Math.round((rig.bones[chest].head[2] + rig.bones[chest].tail[2]) / 2);
-  const found = new Set<number>();
-  for (let y = 0; y < m.size.y; y++) for (let x = 0; x < m.size.x; x++) found.add(m.data[x + y * m.size.x + z * m.size.x * m.size.y]);
-  ok([ROLE.BONE, ROLE.FLESH, ROLE.ORGAN].every((r) => found.has(r)), "a slice through the chest shows bone, flesh and organs");
-  const head = rig.bones.findIndex((b) => b.id === "head");
-  const hz = Math.round(rig.bones[head].head[2] + 3);
-  const inHead = new Set<number>();
-  for (let y = 0; y < m.size.y; y++) for (let x = 0; x < m.size.x; x++) inHead.add(m.data[x + y * m.size.x + hz * m.size.x * m.size.y]);
-  ok(inHead.has(ROLE.BONE) && inHead.has(ROLE.ORGAN), "the head has a skull around a brain");
-}
-
-console.log("clips:");
-{
-  const minYOf = (b: EntityModel, bone: number | null) => {
-    const { x: sx, y: sy } = b.size;
-    let lo = Infinity;
-    for (let i = 0; i < b.data.length; i++) {
-      if (!b.data[i] || (bone !== null && b.bones![i] !== bone)) continue;
-      lo = Math.min(lo, ((i / sx) | 0) % sy);
-    }
-    return lo;
-  };
-  for (const clip of rat.clips!) {
-    let worst = 1, maxExposed = 0;
-    for (let k = 0; k < 12; k++) {
-      const t = (clip.duration * k) / 12;
-      const b = bakePose(m, rig, poseMatrices(rig, sampleClip(clip, t, n)));
-      worst = Math.min(worst, largest(b));
-      let ex = 0, surf = 0;
-      for (let i = 0; i < b.data.length; i++) {
-        if (!b.data[i] || !onSurface(b, i)) continue;
-        surf++;
-        if (INTERIOR.has(b.data[i])) ex++;
-      }
-      maxExposed = Math.max(maxExposed, ex / Math.max(1, surf));
-    }
-    ok(worst > 0.985, `${clip.id}: stays one piece in every frame (worst ${(worst * 100).toFixed(1)}%)`);
-    ok(maxExposed < 0.01, `  ${clip.id}: no inside showing in any pose (worst ${(maxExposed * 100).toFixed(2)}% of the surface)`);
-    if (clip.loop) {
-      const a = sampleClip(clip, 0, n).rotations, e = sampleClip(clip, clip.duration - 1e-6, n).rotations;
-      ok(a.every((v, i) => Math.abs(Math.abs(v) - Math.abs(e[i])) < 1e-3), `  ${clip.id}: the loop closes`);
-    }
-  }
-  const walk = rat.clips!.find((c) => c.id === "walk")!;
-  let grounded = true;
-  for (const ev of walk.events ?? []) {
-    const leg = ev.name.split(".")[1];
-    const foot = rig.bones.findIndex((b) => b.id === `${leg}.foot`);
-    const b = bakePose(m, rig, poseMatrices(rig, sampleClip(walk, ev.t, n)));
-    const lowestFoot = Math.min(...["FL", "FR", "HL", "HR"].map((l) => minYOf(b, rig.bones.findIndex((x) => x.id === `${l}.foot`))));
-    if (minYOf(b, foot) > lowestFoot + 1 || minYOf(b, null) < lowestFoot - 1) grounded = false;
-  }
-  ok(grounded, "walk: each foot is down at its footfall event, and nothing hangs below the feet");
-}
-
-console.log("damage:");
-{
-  const blood = ROLE.BLOOD;
-  const spine = rig.bones.findIndex((b) => b.id === "spine");
-  const [px, py, pz] = rig.bones[spine].head;
-  const hurt = wound(m, [px + 5, py, pz], 3, { rim: blood });
-  let inside = 0;
-  for (let i = 0; i < hurt.data.length; i++) if (hurt.data[i] && INTERIOR.has(hurt.data[i]) && onSurface(hurt, i)) inside++;
-  ok(inside > 10, `a wound in the flank shows the inside (${inside} voxels)`);
-  const tail = rig.bones.findIndex((b) => b.id === "tail2");
-  const cut = sever(m, rig, tail, { rim: blood });
-  ok(!!cut.piece && cut.piece.rig.bones.length === 5, `severing the tail at the third bone takes the rest of the tail with it (${cut.piece?.rig.bones.length} bones)`);
-  const leg = rig.bones.findIndex((b) => b.id === "HL.upper");
-  const cutLeg = sever(m, rig, leg, { rim: blood });
-  ok(!!cutLeg.piece && cutLeg.piece.rig.bones.length === 3, "a hind leg comes off whole (thigh, shin, foot)");
-}
 
 console.log("determinism and cost:");
 {

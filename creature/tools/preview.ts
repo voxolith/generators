@@ -1,5 +1,5 @@
 // Contact sheets for judging the creature.
-//   bun tools/preview.ts [species|cut|clips|walk|turns] [--width N]
+//   bun tools/preview.ts [species|cut|clips|walk|turns] [--width N] [--scale VOXELS_PER_METRE]
 // species: every preset at rest. cut: halves and slices showing the inside.
 // clips: a strip of frames per clip, to judge whether the resolution animates.
 
@@ -8,7 +8,7 @@ import { seededRandom } from "@voxolith/renderer/core";
 import { contactSheet, cutAway, encodePng, renderEntity, type SheetCell } from "@voxolith/gen-kit/preview";
 import { bakePose, poseMatrices, sampleClip } from "@voxolith/engine/animation";
 import type { Entity } from "@voxolith/engine";
-import { generateCreature, PRESETS, PRESET_NAMES } from "../src/index";
+import { atScale, generateCreature, PRESETS, PRESET_NAMES } from "../src/index";
 
 const args = process.argv.slice(2);
 const round = args.find((a) => !a.startsWith("--")) ?? "species";
@@ -19,7 +19,10 @@ mkdirSync(OUT, { recursive: true });
 const view = { width: W, height: Math.round(W * 0.75), yawDeg: 55, pitchDeg: 18 };
 const cells: SheetCell[] = [];
 let cols = 4;
-const rat = generateCreature(PRESETS.rat, seededRandom(7)).entity;
+// --scale 100 judges the rat as it is sized for a 1 cm world (atScale).
+const scale = Number(args[args.indexOf("--scale") + 1] ?? 0) || 0;
+const ratParams = scale ? atScale(PRESETS.rat, scale) : PRESETS.rat;
+const rat = generateCreature(ratParams, seededRandom(7)).entity;
 const posed = (e: Entity, clip: string, t: number, yaw = 0): Entity => {
   const c = e.clips!.find((k) => k.id === clip)!;
   const m = bakePose(e.model, e.rig!, poseMatrices(e.rig!, sampleClip(c, t, e.rig!.bones.length)), { yaw });

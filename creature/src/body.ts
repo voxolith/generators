@@ -27,6 +27,11 @@ export interface Body {
 export const LEGS = ["FL", "FR", "HL", "HR"] as const;
 export type Leg = (typeof LEGS)[number];
 const TAIL_BONES = 7;
+// Resolution floors, in voxels of radius: below them a limb bent by a clip
+// comes apart. Below every preset's own sizes, so they only act on small rats.
+const MIN_LIMB = 1.2;
+const MIN_FOOT = 1.05;
+const MIN_TAIL = 0.8;
 
 export function buildBody(p: CreatureParams, rng: () => number): Body {
   const noise: Noise = makeNoise(Math.floor(rng() * 0x7fffffff) || 1);
@@ -102,7 +107,9 @@ export function buildBody(p: CreatureParams, rng: () => number): Body {
   }
   for (let k = 0; k < TAIL_BONES; k++) {
     const f0 = k / TAIL_BONES, f1 = (k + 1) / TAIL_BONES;
-    const rad = (f: number) => (1.8 - 1.45 * f) * tt;
+    // The first part of the tail never thins below 1.5 voxels across, however
+    // small the rat; only the tip goes down to a line.
+    const rad = (f: number) => Math.max(f < 0.6 ? MIN_TAIL : 0, (1.8 - 1.45 * f) * tt);
     r.capsule(B[`tail${k}`], at(...tailPts[k]), at(...tailPts[k + 1]), rad(f0), rad(f1), K);
   }
   for (const leg of LEGS) {
@@ -111,14 +118,19 @@ export function buildBody(p: CreatureParams, rng: () => number): Body {
     const up = fore ? [1.9, 1.45] : [2.5, 1.6];
     r.capsule(B[`${leg}.upper`], at(...a), at(...b), up[0] * lt, up[1] * lt, F);
     if (!fore) r.ellipsoid(B[`${leg}.upper`], at(a[0] * 0.95, a[1] - 0.8, a[2] + 0.6), [2.3 * lt, 2.8 * lt, 3 * lt], F); // haunch
-    r.capsule(B[`${leg}.lower`], at(...b), at(...c), 1.4 * lt, 1.15 * lt, F);
-    r.capsule(B[`${leg}.foot`], at(...c), at(...d), 1.15 * lt, 1.0 * lt, K);
+    r.capsule(B[`${leg}.lower`], at(...b), at(...c), Math.max(MIN_LIMB, 1.4 * lt), Math.max(MIN_LIMB, 1.15 * lt), F);
+    r.capsule(B[`${leg}.foot`], at(...c), at(...d), Math.max(MIN_LIMB, 1.15 * lt), Math.max(MIN_FOOT, 1.0 * lt), K);
   }
   // Nose pad, before layering so it stays whole.
   r.ellipsoid(B.head, at(0, bodyY - 0.4, noseZ - 0.2), [1.2 * g, 1.1 * g, 1], ROLE.NOSE);
 
   // --- 3. inside ------------------------------------------------------------------
-  const depth = r.layerInterior([F, ROLE.FAT, ROLE.FLESH, ROLE.FLESH, ROLE.MUSCLE], (v) => v === F);
+  // A small rat has too few voxels below the fur for every layer: drop the
+  // fat and one flesh step and let bone and organs sit one voxel shallower,
+  // so a wound still shows what is inside.
+  const thin = S < 1;
+  const md = (k: number) => (thin ? Math.max(1, k - 1) : k);
+  const depth = r.layerInterior(thin ? [F, ROLE.FLESH, ROLE.MUSCLE] : [F, ROLE.FAT, ROLE.FLESH, ROLE.FLESH, ROLE.MUSCLE], (v) => v === F);
   r.layerInterior([K, ROLE.FLESH, ROLE.MUSCLE], (v) => v === K);
   // Deep structures only replace voxels at least `minDepth` below the surface.
   const scratch = new Volume(sx, sy, sz);
@@ -127,6 +139,8 @@ export function buildBody(p: CreatureParams, rng: () => number): Body {
     draw(scratch);
     for (let i = 0; i < scratch.data.length; i++) {
       if (!scratch.data[i] || !r.vol.data[i] || depth[i] < minDepth) continue;
+      // Packed tight, organs would erase a small rat's one-voxel spine.
+      if (thin && value !== ROLE.BONE && r.vol.data[i] === ROLE.BONE) continue;
       r.vol.data[i] = value;
       if (bone !== null) r.owner[i] = bone;
     }
@@ -140,22 +154,22 @@ export function buildBody(p: CreatureParams, rng: () => number): Body {
       });
     }
   };
-  bonesOf(["pelvis", "spine", "chest", "neck"], 1.1 * g, 2);
+  bonesOf(["pelvis", "spine", "chest", "neck"], Math.max(1, 1.1 * g), md(2));
   bonesOf(LEGS.flatMap((l) => [`${l}.upper`, `${l}.lower`]), 0.8 * lt);
   bonesOf(Array.from({ length: TAIL_BONES }, (_, k) => `tail${k}`), 0.5);
-  // Marrow down the spine.
-  for (const id of ["pelvis", "spine", "chest"]) {
+  // Marrow down the spine (a spine too thin to hold marrow is all bone).
+  if (!thin) for (const id of ["pelvis", "spine", "chest"]) {
     const b = r.bones[B[id]];
-    inner(3, ROLE.MARROW, B[id], (v) => lineIn(v, b.head, b.tail));
+    inner(md(3), ROLE.MARROW, B[id], (v) => lineIn(v, b.head, b.tail));
   }
   // Skull shell with the brain inside; ribs; lungs, heart, gut.
-  inner(1, ROLE.BONE, B.head, (v) => ellipsoidIn(v, at(0, bodyY + 1.3, headZ + 3 * hl), [2.8 * g, 2.7 * g, 3.4 * hl], (d) => d > 0.72));
-  inner(2, ROLE.ORGAN, B.head, (v) => ellipsoidIn(v, at(0, bodyY + 1.5, headZ + 2.6 * hl), [2 * g, 1.9 * g, 2.3 * hl]));
-  inner(1, ROLE.BONE, B.chest, (v) => ellipsoidIn(v, at(0, bodyY + 0.3, 12.5 * bl), [4.1 * g, 3.9 * g, 5 * bl], (d, z) => d > 0.8 && Math.round(z) % 3 === 0));
-  inner(2, ROLE.ORGAN, B.chest, (v) => ellipsoidIn(v, at(0, bodyY + 0.6, 12.8 * bl), [3 * g, 2.8 * g, 3.4 * bl]));
-  inner(2, ROLE.ORGAN_DARK, B.chest, (v) => ellipsoidIn(v, at(0.6 * g, bodyY - 0.5, 13.4 * bl), [1.6 * g, 1.7 * g, 1.7 * bl]));
-  inner(2, ROLE.ORGAN, B.spine, (v) => ellipsoidIn(v, at(0, bodyY - 0.6, 7.2 * bl), [3.6 * g, 2.8 * g, 4.4 * bl]));
-  inner(3, ROLE.ORGAN_DARK, B.spine, (v) => ellipsoidIn(v, at(0, bodyY - 0.6, 7.2 * bl), [3 * g, 2.2 * g, 3.8 * bl], (_d, z, x, y) => noise.value3(x * 0.5, y * 0.5, z * 0.5) > 0.55));
+  inner(md(1), ROLE.BONE, B.head, (v) => ellipsoidIn(v, at(0, bodyY + 1.3, headZ + 3 * hl), [2.8 * g, 2.7 * g, 3.4 * hl], (d) => d > 0.72));
+  inner(md(2), ROLE.ORGAN, B.head, (v) => ellipsoidIn(v, at(0, bodyY + 1.5, headZ + 2.6 * hl), [Math.max(1.8, 2 * g), Math.max(1.8, 1.9 * g), Math.max(2, 2.3 * hl)]));
+  inner(md(1), ROLE.BONE, B.chest, (v) => ellipsoidIn(v, at(0, bodyY + 0.3, 12.5 * bl), [4.1 * g, 3.9 * g, 5 * bl], (d, z) => d > 0.8 && Math.round(z) % 3 === 0));
+  inner(md(2), ROLE.ORGAN, B.chest, (v) => ellipsoidIn(v, at(0, bodyY + 0.6, 12.8 * bl), [3 * g, 2.8 * g, 3.4 * bl]));
+  inner(md(2), ROLE.ORGAN_DARK, B.chest, (v) => ellipsoidIn(v, at(0.6 * g, bodyY - 0.5, 13.4 * bl), [1.6 * g, 1.7 * g, 1.7 * bl]));
+  inner(md(2), ROLE.ORGAN, B.spine, (v) => ellipsoidIn(v, at(0, bodyY - 0.6, 7.2 * bl), [3.6 * g, 2.8 * g, 4.4 * bl]));
+  inner(md(3), ROLE.ORGAN_DARK, B.spine, (v) => ellipsoidIn(v, at(0, bodyY - 0.6, 7.2 * bl), [3 * g, 2.2 * g, 3.8 * bl], (_d, z, x, y) => noise.value3(x * 0.5, y * 0.5, z * 0.5) > 0.55));
 
   // --- 4. surface ------------------------------------------------------------------
   const vol = r.vol;
