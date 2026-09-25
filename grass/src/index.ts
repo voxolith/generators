@@ -255,7 +255,7 @@ export const grassGenerator: EntityGenerator<GrassParams> = {
   defaults: PRESETS.grass,
   params: PARAMS,
   generate: (params, rng, ctx) => generateGrass(params, rng, undefined, ctx).entity,
-  scales: [100],
+  scales: [50, 100],
 };
 
 export const meadowGenerator: EntityGenerator<GrassParams> = {

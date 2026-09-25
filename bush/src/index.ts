@@ -272,7 +272,7 @@ export const bushGenerator: EntityGenerator<BushParams> = {
   defaults: PRESETS.bush,
   params: PARAMS,
   generate: (params, rng, ctx) => generateBush(params, rng, undefined, ctx).entity,
-  scales: [100],
+  scales: [50, 100],
 };
 
 export const thicketGenerator: EntityGenerator<BushParams> = {

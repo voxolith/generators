@@ -256,7 +256,7 @@ function makeTreeGenerator(kind: "broadleaf" | "conifer", defaults: TreeParams):
     defaults,
     params: SHARED_PARAMS,
     generate: (params, rng, ctx) => generateTree(params, rng, undefined, ctx).entity,
-    scales: [100],
+    scales: [50, 100],
   };
 }
 

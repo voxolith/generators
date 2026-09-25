@@ -894,7 +894,7 @@ export const houseGenerator: EntityGenerator<BuildingParams> = {
   defaults: PRESETS.cottage,
   params: PARAMS,
   generate: (params, rng, ctx) => generateBuilding(params, rng, undefined, ctx).entity,
-  scales: [100],
+  scales: [50, 100],
 };
 
 export const townhouseGenerator: EntityGenerator<BuildingParams> = {

@@ -36,7 +36,7 @@ const { entity } = generateTree(PRESETS.oak, seededRandom(42));
 
 ## Finer scales
 
-Parameters are written in 10 voxels per metre. Every entity generator also builds at 100
+Parameters are written in 10 voxels per metre. Every entity generator also builds at 50 and 100
 (`generate(params, rng, { voxelsPerMetre: 100 })`, listed in its `scales`): the same design,
 built at its native scale and then refined by gen-kit's `refine` with the generator's own
 rules. Trees, bushes and grass redraw their limbs and blades from their skeletons, thinner than

@@ -246,7 +246,7 @@ export const rockGenerator: EntityGenerator<RockParams> = {
   defaults: PRESETS.boulder,
   params: PARAMS,
   generate: (params, rng, ctx) => generateRock(params, rng, undefined, ctx).entity,
-  scales: [100],
+  scales: [50, 100],
 };
 
 export const outcropGenerator: EntityGenerator<RockParams> = {
