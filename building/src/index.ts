@@ -23,7 +23,8 @@
 // rng or from hashes of positions, so the same seed rebuilds the same house.
 
 import { hash01, makeNoise, Volume } from "@voxolith/gen-kit";
-import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { refinement, registerGenerator, type Entity, type EntityGenerator, type GenerateContext, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { fineBuilding } from "./fine";
 import { buildRoles, ROLE } from "./roles";
 import { cloneParams, type BuildingParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
@@ -70,9 +71,16 @@ interface Opening {
 
 const h2 = (a: number, b: number, c = 0) => hash01((Math.imul(a, 73856093) ^ Math.imul(b, 19349663) ^ Math.imul(c, 83492791)) | 0);
 
-export function generateBuilding(params: BuildingParams, rng: () => number, id = "building"): BuildingResult {
+/**
+ * Generate a building. A finer `ctx.voxelsPerMetre` builds the same design
+ * without its coarse relief and refines it with masonry and joinery at their
+ * real size (see fine.ts).
+ */
+export function generateBuilding(params: BuildingParams, rng: () => number, id = "building", ctx?: GenerateContext): BuildingResult {
   const t0 = performance.now();
   const p = cloneParams(params);
+  const k = refinement(ctx);
+  if (k > 1) p.look.relief = false;
   const noise = makeNoise(Math.floor(rng() * 0x7fffffff) || 1);
   const s = p.shape, o = p.openings, look = p.look;
 
@@ -826,7 +834,8 @@ export function generateBuilding(params: BuildingParams, rng: () => number, id =
   }
 
   const anchor: Vec3 = [(x0 + x1 + 1) / 2, 0, (z0 + z1 + 1) / 2];
-  const model = vol.crop(anchor, buildRoles(skinFor(look.wall, look.roofStyle)));
+  let model = vol.crop(anchor, buildRoles(skinFor(look.wall, look.roofStyle)));
+  if (k > 1) model = fineBuilding(model, look, k, Math.floor(rng() * 0x7fffffff));
   let total = 0;
   for (let i = 0; i < vol.data.length; i++) if (vol.data[i] !== 0) total++;
 
@@ -835,7 +844,7 @@ export function generateBuilding(params: BuildingParams, rng: () => number, id =
       id,
       kind: "building",
       model,
-      meta: { species: p.species, storeys: N, roof: s.roof, generator: "voxolith/gen-building" },
+      meta: { species: p.species, storeys: N, roof: s.roof, generator: "voxolith/gen-building", ...(k > 1 ? { voxelsPerMetre: k * 10 } : {}) },
     },
     stats: { total, windows, lit, doors: 1, storeys: N, size: model.size, ms: performance.now() - t0 },
   };
@@ -881,9 +890,11 @@ export const houseGenerator: EntityGenerator<BuildingParams> = {
   version: "0.2.0",
   description: "Shape-grammar building with textured masonry or timber framing, detailed windows and doors, coursed or thatched roofs, chimneys and weathering.",
   roles: buildRoles(skinFor("plaster", "thatch")),
+  looseRoles: [ROLE.FLOWER_A, ROLE.FLOWER_B, ROLE.LEAF].map((v) => buildRoles(skinFor("plaster", "thatch"))[v - 1].id),
   defaults: PRESETS.cottage,
   params: PARAMS,
-  generate: (params, rng) => generateBuilding(params, rng).entity,
+  generate: (params, rng, ctx) => generateBuilding(params, rng, undefined, ctx).entity,
+  scales: [100],
 };
 
 export const townhouseGenerator: EntityGenerator<BuildingParams> = {

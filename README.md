@@ -34,6 +34,23 @@ import { seededRandom } from "@voxolith/renderer/core";
 const { entity } = generateTree(PRESETS.oak, seededRandom(42));
 ```
 
+## Finer scales
+
+Parameters are written in 10 voxels per metre. Every entity generator also builds at 100
+(`generate(params, rng, { voxelsPerMetre: 100 })`, listed in its `scales`): the same design,
+built at its native scale and then refined by gen-kit's `refine` with the generator's own
+rules. Trees, bushes and grass redraw their limbs and blades from their skeletons, thinner than
+a coarse voxel allows, with single leaves or needles in the coarse shading; buildings get bricks,
+stone courses, tiles, slates, thatch, boards and planks at real size (their rooms are skipped);
+rocks round off with grain and hairline cracks. The creature is already authored near that
+scale; `atScale` sizes it. Results are sparse models of a few to a few tens of MB of GPU bricks,
+in 0.1 to 3 seconds each.
+
+```ts
+const oak = generateTree(PRESETS.oak, seededRandom(42), "oak", { voxelsPerMetre: 100 }).entity;
+oak.model.sparse; // 8^3 bricks; draw with renderer.addModel / setInstances
+```
+
 ## Working on them
 
 Clone alongside `voxolith/renderer` and `voxolith/engine` and run `bun install` from a workspace
@@ -53,11 +70,15 @@ what the engine relies on: namespaced id and semver version, unique roles with c
 0..1, defaults inside their own ParamSpecs, the same seed giving the same voxels (even after
 other calls), params never mutated, voxel values within the declared roles, the anchor inside
 the model, nothing floating (every voxel connected to the base), share codes rebuilding the
-same model, and every parameter at its min, max and each enum option still generating.
+same model, and every parameter at its min, max and each enum option still generating. At each
+finer scale a generator lists, the model must be sparse, exactly k times the native size,
+deterministic, within its roles, with the anchor scaled, its structure grounded (the
+`looseRoles`, single leaves and petals, may float), within 20 s and 96 MB of GPU bricks.
 
 ```sh
 bun run --cwd contract verify    # quick: defaults only (part of `bun run check`)
-bun run --cwd contract full      # every parameter extreme (CI)
+bun run --cwd contract full      # every parameter extreme and every finer scale (CI)
+bun run --cwd contract fine      # defaults at the finer scales only
 ```
 
 `gen-terrain` is not an entity generator and is not covered: it describes a region (a

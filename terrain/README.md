@@ -27,6 +27,21 @@ ctx.edit({ ...ctx.box, y1: terrain.maxY() }, (cells, ox, oy, oz) => terrain.fill
 - `terrainHeight(params, seed)` is the height function on its own, pure in (x, z), for a world
   that streams columns without sampling the whole map.
 
+## Finer
+
+`refineTerrain(terrain, k, { grass, bladeHeight, skin })` is the same terrain k times finer,
+answered per brick like the coarse one, so a valley of 1 cm voxels can stream. The coarse
+heightfield stays the source of truth (levelled pads stay flat, the river and banks stay put);
+the fine one adds a bicubic surface with micro relief, organic edges between surface roles and
+paths, clumped grass blades, pebbles on beds and paths, and only a skin of ground below the
+surface (it is seen from above). Edit a box per 8x8 brick column sized by `columnSpan(ox, oz)`:
+each column is computed once for its whole stack of bricks (about 40 ms per 256² chunk).
+
+```ts
+const fine = refineTerrain(terrain, 10, { seed });
+renderer.editMany(boxes, (cells, ox, oy, oz) => fine.fillBrick(cells, ox, oy, oz, base, top));
+```
+
 ```sh
 bun run verify              # shape, river continuity, fillBrick vs roleAt, determinism, picking
 bun run preview             # a shaded map into previews/map.png

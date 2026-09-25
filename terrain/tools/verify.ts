@@ -1,6 +1,6 @@
 // Headless checks for the terrain generator. No GPU.  bun tools/verify.ts
 
-import { DEFAULT_TERRAIN, generateTerrain, ROLE, terrainHeight } from "../src/index";
+import { DEFAULT_TERRAIN, generateTerrain, refineTerrain, ROLE, terrainHeight } from "../src/index";
 
 let failures = 0;
 const ok = (c: boolean, m: string) => {
@@ -121,6 +121,53 @@ console.log("picking:");
   const x = 300, z = 300, h = t.heightAt(x, z);
   const hit = t.pick([x, h + 80, z - 80], [0, -1, 1]);
   ok(!!hit && Math.abs(hit[1] - (t.heightAt(hit[0], hit[2]))) <= 1.5, `a ray from above lands on the ground (${hit?.map((v) => v.toFixed(1))})`);
+}
+
+console.log("refined (k = 10):");
+{
+  const c = generateTerrain({ width: 160, depth: 160, height: 192 }, 11);
+  // Level a pad, as a settlement does, before refining.
+  for (let z = 60; z < 80; z++) for (let x = 60; x < 80; x++) c.heights[x + z * 160] = 30;
+  const K = 10, f = refineTerrain(c, K, { seed: 11 });
+  let worst = 0;
+  for (let i = 0; i < 400; i++) {
+    const cx = 5 + ((i * 37) % 150), cz = 5 + ((i * 91) % 150);
+    const fineTop = f.heightAt(cx * K + 5, cz * K + 5) + 1, coarseTop = (c.heights[cx + cz * 160] + 1) * K;
+    worst = Math.max(worst, Math.abs(fineTop - coarseTop));
+  }
+  ok(worst <= 3 * K, `the fine surface follows the coarse one (worst ${worst} fine voxels at a column centre)`);
+  let flat = true;
+  for (let z = 640; z < 780; z += 7) for (let x = 640; x < 780; x += 7) if (f.heightAt(x, z) !== 31 * K - 1) flat = false;
+  ok(flat, "a levelled pad stays exactly flat");
+  const cells = new Uint8Array(512);
+  let outside = 0, water = 0, blades = 0, filled = 0;
+  for (let bz = 0; bz < 40; bz++)
+    for (let bx = 0; bx < 40; bx++) {
+      const [y0, y1] = f.columnSpan(bx * 8, bz * 8);
+      for (let by = Math.max(0, Math.floor((y0 - 64) / 8)); by <= Math.floor((y1 + 64) / 8); by++) {
+        cells.fill(0);
+        if (!f.fillBrick(cells, bx * 8, by * 8, bz * 8, 1)) continue;
+        filled++;
+        for (let i = 0; i < 512; i++) {
+          if (!cells[i]) continue;
+          const y = by * 8 + ((i >> 3) & 7);
+          if (y < y0 || y > y1) outside++;
+          if (cells[i] === ROLE.WATER) water++;
+          if ((cells[i] === ROLE.GRASS || cells[i] === ROLE.GRASS_LIGHT) && y > f.heightAt(bx * 8 + (i & 7), bz * 8 + (i >> 6))) blades++;
+        }
+      }
+    }
+  ok(outside === 0, `nothing is written outside a column's span (${outside})`);
+  ok(filled > 0 && blades > 0, `grassy ground grows blades (${blades} blade voxels)`);
+  const wx = [...Array(160 * 160).keys()].find((i) => c.waterAt(i % 160, Math.floor(i / 160)));
+  if (wx !== undefined) {
+    const x = (wx % 160) * K + 5, z = Math.floor(wx / 160) * K + 5;
+    ok(f.waterAt(x, z) && f.waterTop === (c.waterLevel) * K - 1, "flooded columns carry water to the refined water level");
+  }
+  const a = new Uint8Array(512), b = new Uint8Array(512);
+  f.fillBrick(a, 400, f.heightAt(400, 400) & ~7, 400, 1);
+  refineTerrain(c, K, { seed: 11 }).fillBrick(b, 400, f.heightAt(400, 400) & ~7, 400, 1);
+  ok(a.every((v, i) => v === b[i]), "deterministic");
 }
 
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nALL CHECKS PASSED");

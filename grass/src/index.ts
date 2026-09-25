@@ -20,7 +20,8 @@ import {
   type Noise,
   type StemSeed,
 } from "@voxolith/gen-kit";
-import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { refinement, registerGenerator, type GenerateContext, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { fineGrass } from "./fine";
 import { buildRoles, ROLE } from "./roles";
 import { cloneParams, REFERENCE_HEIGHT, type GrassParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
@@ -71,7 +72,8 @@ function bladeSeeds(p: GrassParams, rng: () => number): { seeds: StemSeed[]; tuf
   return { seeds, tufts };
 }
 
-export function generateGrass(params: GrassParams, rng: () => number, id = "grass"): GrassResult {
+/** A finer `ctx.voxelsPerMetre` refines the result (see fine.ts). */
+export function generateGrass(params: GrassParams, rng: () => number, id = "grass", ctx?: GenerateContext): GrassResult {
   const t0 = performance.now();
   const p = cloneParams(params);
   const noise = makeNoise(Math.floor(rng() * 0x7fffffff) || 1);
@@ -191,7 +193,9 @@ export function generateGrass(params: GrassParams, rng: () => number, id = "gras
     }
   }
 
-  const model = vol.crop(origin, buildRoles(skinFor(p.species, p.look.season)));
+  let model = vol.crop(origin, buildRoles(skinFor(p.species, p.look.season)));
+  const k = refinement(ctx);
+  if (k > 1) model = fineGrass(model, skel, origin, k, Math.floor(rng() * 0x7fffffff));
   let total = 0;
   for (let i = 0; i < vol.data.length; i++) if (vol.data[i] !== 0) total++;
 
@@ -200,7 +204,7 @@ export function generateGrass(params: GrassParams, rng: () => number, id = "gras
       id,
       kind: "groundcover",
       model,
-      meta: { species: p.species, season: p.look.season, height: p.shape.height, generator: "voxolith/gen-grass" },
+      meta: { species: p.species, season: p.look.season, height: p.shape.height, generator: "voxolith/gen-grass", ...(k > 1 ? { voxelsPerMetre: k * 10 } : {}) },
     },
     stats: {
       total,
@@ -247,9 +251,11 @@ export const grassGenerator: EntityGenerator<GrassParams> = {
   version: "0.1.0",
   description: "Tufts of arcing blades over a disc, with a base-to-tip gradient and optional flowers.",
   roles: buildRoles(skinFor("grass", "summer")),
+  looseRoles: [ROLE.FLOWER_A, ROLE.FLOWER_B, ROLE.FLOWER_C, ROLE.SEED, ROLE.SNOW].map((v) => buildRoles(skinFor("grass", "summer"))[v - 1].id),
   defaults: PRESETS.grass,
   params: PARAMS,
-  generate: (params, rng) => generateGrass(params, rng).entity,
+  generate: (params, rng, ctx) => generateGrass(params, rng, undefined, ctx).entity,
+  scales: [100],
 };
 
 export const meadowGenerator: EntityGenerator<GrassParams> = {

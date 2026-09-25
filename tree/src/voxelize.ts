@@ -17,6 +17,12 @@ export interface WoodResult {
   /** Segment index + 1 for every wood voxel, so the bark pass can recover a frame. */
   segId: Uint16Array;
   filled: number;
+  /** Radius factor of the flared, lobed trunk base at a volume point (1 elsewhere). */
+  flare: (x: number, y: number, z: number) => number;
+  /** Largest value `flare` takes. */
+  maxFlare: number;
+  /** Surface roots as drawn: volume-space capsules. */
+  roots: { a: Vec3; b: Vec3; ra: number; rb: number }[];
 }
 
 export function voxelizeWood(vol: Volume, skel: Skeleton, shape: ShapeParams, origin: Vec3, rng: () => number): WoodResult {
@@ -61,11 +67,13 @@ export function voxelizeWood(vol: Volume, skel: Skeleton, shape: ShapeParams, or
   // the silhouette where the trunk meets the ground.
   const nRoots = Math.round(shape.trunk.roots);
   const baseR = shape.height * shape.trunk.radiusRatio;
+  const roots: WoodResult["roots"] = [];
   for (let k = 0; k < nRoots; k++) {
     const th = (k / nRoots) * Math.PI * 2 + rng() * 0.6;
     const len = baseR * (1.6 + rng() * 1.4);
     const a: Vec3 = [origin[0], origin[1] + baseR * 0.4, origin[2]];
     const b: Vec3 = [origin[0] + Math.cos(th) * len, origin[1] + 0.5, origin[2] + Math.sin(th) * len];
+    roots.push({ a, b, ra: baseR * 0.45, rb: Math.max(1, baseR * 0.16) });
     filled += capsule(vol, a, b, baseR * 0.45, Math.max(1, baseR * 0.16), ROLE.HEART, {
       onFill: (idx) => {
         if (segId[idx] === 0) segId[idx] = 1;
@@ -73,5 +81,5 @@ export function voxelizeWood(vol: Volume, skel: Skeleton, shape: ShapeParams, or
     });
   }
 
-  return { segId, filled };
+  return { segId, filled, flare, maxFlare: 1 + gain * 1.45, roots };
 }

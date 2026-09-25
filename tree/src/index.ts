@@ -21,7 +21,8 @@ import {
   type BranchParams,
   type ClusterResult,
 } from "@voxolith/gen-kit";
-import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { refinement, registerGenerator, type Entity, type EntityGenerator, type GenerateContext, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { fineTree } from "./fine";
 import { paintBark } from "./bark";
 import { placeBroadleafClusters } from "./foliage/broadleaf";
 import { placeConiferNeedles } from "./foliage/conifer";
@@ -87,7 +88,11 @@ function branchParamsFor(shape: ShapeParams, rng: () => number): BranchParams {
   };
 }
 
-export function generateTree(params: TreeParams, rng: () => number, id = "tree"): TreeResult {
+/**
+ * Generate a tree. With `ctx.voxelsPerMetre` above the native 10, the same
+ * design comes back refined (sparse model, k times the size): see fine.ts.
+ */
+export function generateTree(params: TreeParams, rng: () => number, id = "tree", ctx?: GenerateContext): TreeResult {
   const t0 = performance.now();
   const p = cloneParams(params);
   applyAgeAndHealth(p.shape, p.look);
@@ -168,7 +173,12 @@ export function generateTree(params: TreeParams, rng: () => number, id = "tree")
     }
   }
 
-  const model = vol.crop(origin, buildRoles(skinFor(p.species, p.look.season)));
+  let model = vol.crop(origin, buildRoles(skinFor(p.species, p.look.season)));
+  const k = refinement(ctx);
+  if (k > 1) {
+    const cropOffset: Vec3 = [origin[0] - model.anchor[0], origin[1] - model.anchor[1], origin[2] - model.anchor[2]];
+    model = fineTree({ coarse: model, skel, wood, kind: p.shape.kind, origin, cropOffset, k, seed: Math.floor(rng() * 0x7fffffff) }).model;
+  }
   let woodFinal = 0;
   let leafFinal = 0;
   for (let i = 0; i < vol.data.length; i++) {
@@ -187,6 +197,7 @@ export function generateTree(params: TreeParams, rng: () => number, id = "tree")
       season: p.look.season,
       height: p.shape.height,
       generator: "voxolith/gen-tree",
+      ...(k > 1 ? { voxelsPerMetre: k * 10 } : {}),
     },
   };
 
@@ -241,9 +252,11 @@ function makeTreeGenerator(kind: "broadleaf" | "conifer", defaults: TreeParams):
         ? "Oak-like tree: flared trunk, recursive limbs, leaf clusters with sky holes."
         : "Spruce-like tree: straight leader, whorled branches, needle sheaths in a conical crown.",
     roles: buildRoles(skinFor(defaults.species, defaults.look.season)),
+    looseRoles: [ROLE.LEAF_HI, ROLE.LEAF_MID, ROLE.LEAF_LO, ROLE.LEAF_EDGE, ROLE.LEAF_ACCENT, ROLE.LEAF_DEAD, ROLE.BLOSSOM, ROLE.SNOW, ROLE.CONE].map((v) => buildRoles(skinFor(defaults.species, defaults.look.season))[v - 1].id),
     defaults,
     params: SHARED_PARAMS,
-    generate: (params, rng) => generateTree(params, rng).entity,
+    generate: (params, rng, ctx) => generateTree(params, rng, undefined, ctx).entity,
+    scales: [100],
   };
 }
 

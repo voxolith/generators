@@ -296,3 +296,5 @@ export function generateTerrain(params: Partial<TerrainParams> = {}, seed = 1): 
 
 export { buildRoles, ROLE, ROLE_COUNT, SUMMER } from "./roles";
 export type { ColorSet } from "./roles";
+export { refineTerrain } from "./fine";
+export type { FineTerrain, FineTerrainOptions } from "./fine";

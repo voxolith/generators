@@ -10,7 +10,8 @@
 // game that breaks a rock open will.
 
 import { blob, facet, makeNoise, Volume, type Noise } from "@voxolith/gen-kit";
-import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { refinement, registerGenerator, type GenerateContext, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { fineRock } from "./fine";
 import { buildRoles, ROLE } from "./roles";
 import { cloneParams, type RockParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
@@ -30,7 +31,8 @@ export interface RockResult {
   stats: RockStats;
 }
 
-export function generateRock(params: RockParams, rng: () => number, id = "rock"): RockResult {
+/** A finer `ctx.voxelsPerMetre` refines the result (see fine.ts). */
+export function generateRock(params: RockParams, rng: () => number, id = "rock", ctx?: GenerateContext): RockResult {
   const t0 = performance.now();
   const p = cloneParams(params);
   const noise = makeNoise(Math.floor(rng() * 0x7fffffff) || 1);
@@ -93,7 +95,9 @@ export function generateRock(params: RockParams, rng: () => number, id = "rock")
   // floor, and an anchor below the model would place it floating.
   const bottom = vol.bounds()?.y0 ?? 0;
   const anchor: Vec3 = [cx, bottom + Math.floor(ry * 2 * s.sink), cz];
-  const model = vol.crop(anchor, buildRoles(skinFor(p.species)));
+  let model = vol.crop(anchor, buildRoles(skinFor(p.species)));
+  const k = refinement(ctx);
+  if (k > 1) model = fineRock(model, k, Math.floor(rng() * 0x7fffffff));
 
   let total = 0;
   for (let i = 0; i < vol.data.length; i++) if (vol.data[i] !== 0) total++;
@@ -103,7 +107,7 @@ export function generateRock(params: RockParams, rng: () => number, id = "rock")
       id,
       kind: "rock",
       model,
-      meta: { species: p.species, size: s.size, generator: "voxolith/gen-rock" },
+      meta: { species: p.species, size: s.size, generator: "voxolith/gen-rock", ...(k > 1 ? { voxelsPerMetre: k * 10 } : {}) },
     },
     stats: { total, surface: stats.surface, rocks, moss: stats.moss, cracks: stats.cracks, size: model.size, ms: performance.now() - t0 },
   };
@@ -241,7 +245,8 @@ export const rockGenerator: EntityGenerator<RockParams> = {
   roles: buildRoles(skinFor("granite")),
   defaults: PRESETS.boulder,
   params: PARAMS,
-  generate: (params, rng) => generateRock(params, rng).entity,
+  generate: (params, rng, ctx) => generateRock(params, rng, undefined, ctx).entity,
+  scales: [100],
 };
 
 export const outcropGenerator: EntityGenerator<RockParams> = {

@@ -44,3 +44,8 @@ export type { ClusterOptions, ClusterResult, ClusterSpot } from "./cluster";
 export { blob, facet } from "./blob";
 export { RiggedVolume } from "./rig";
 export type { BlobOptions, FacetOptions, FacetPlane } from "./blob";
+
+export { hash4, refine, shellCapsule, SparseWriter } from "./refine";
+export type { RefineCell, RefineMode, RefineOptions, RefineStats, RoleRule } from "./refine";
+export { coarseRoleAt, drawSkeletonFine } from "./fine";
+export type { FineSegment, FineSkeletonOptions } from "./fine";

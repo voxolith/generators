@@ -78,15 +78,26 @@ export function renderModel(model: EntityModel, opts: RenderOptions = {}): Rende
   const data = model.data;
   const sxy = sx * sy;
 
-  const occ = new OccupancyGrid(model.size, data);
-  const cxn = Math.ceil(sx / COARSE_B), cyn = Math.ceil(sy / COARSE_B), czn = Math.ceil(sz / COARSE_B);
+  // Empty-space skip: the occupancy grid for a dense model, the bricks
+  // themselves for a sparse one.
+  const sp = model.sparse;
+  const B = sp ? 8 : COARSE_B;
+  const cxn = Math.ceil(sx / B), cyn = Math.ceil(sy / B), czn = Math.ceil(sz / B);
+  const occ = sp ? null : new OccupancyGrid(model.size, data);
   const coarseSolid = (x: number, y: number, z: number): boolean => {
-    const cx = (x / COARSE_B) | 0, cy = (y / COARSE_B) | 0, cz = (z / COARSE_B) | 0;
+    const cx = (x / B) | 0, cy = (y / B) | 0, cz = (z / B) | 0;
     if (cx < 0 || cy < 0 || cz < 0 || cx >= cxn || cy >= cyn || cz >= czn) return false;
-    return occ.data[cx + cy * cxn + cz * cxn * cyn] !== 0;
+    return sp ? sp.bricks.has(cx + cy * cxn + cz * cxn * cyn) : occ!.data[cx + cy * cxn + cz * cxn * cyn] !== 0;
   };
-  const at = (x: number, y: number, z: number): number =>
-    x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz ? 0 : data[x + y * sx + z * sxy];
+  let lastKey = -1;
+  let lastBrick: Uint8Array | undefined;
+  const at = (x: number, y: number, z: number): number => {
+    if (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) return 0;
+    if (!sp) return data[x + y * sx + z * sxy];
+    const key = (x >> 3) + (y >> 3) * cxn + (z >> 3) * cxn * cyn;
+    if (key !== lastKey) { lastKey = key; lastBrick = sp.bricks.get(key); }
+    return lastBrick ? lastBrick[(x & 7) + (y & 7) * 8 + (z & 7) * 64] : 0;
+  };
 
   // Colours, indexed by voxel value.
   const colors: RGB[] = [[0, 0, 0]];
@@ -168,12 +179,12 @@ export function renderModel(model: EntityModel, opts: RenderOptions = {}): Rende
 
       if (!coarseSolid(cx, cy, cz)) {
         // Jump the ray to the far plane of the empty coarse block.
-        const bx = ((cx / COARSE_B) | 0) + (stepX > 0 ? 1 : 0);
-        const by = ((cy / COARSE_B) | 0) + (stepY > 0 ? 1 : 0);
-        const bz = ((cz / COARSE_B) | 0) + (stepZ > 0 ? 1 : 0);
-        const tx = stepX ? (bx * COARSE_B - ox) / d[0] : Infinity;
-        const ty = stepY ? (by * COARSE_B - oy) / d[1] : Infinity;
-        const tz = stepZ ? (bz * COARSE_B - oz) / d[2] : Infinity;
+        const bx = ((cx / B) | 0) + (stepX > 0 ? 1 : 0);
+        const by = ((cy / B) | 0) + (stepY > 0 ? 1 : 0);
+        const bz = ((cz / B) | 0) + (stepZ > 0 ? 1 : 0);
+        const tx = stepX ? (bx * B - ox) / d[0] : Infinity;
+        const ty = stepY ? (by * B - oy) / d[1] : Infinity;
+        const tz = stepZ ? (bz * B - oz) / d[2] : Infinity;
         const tExit = Math.min(tx, ty, tz);
         if (!isFinite(tExit) || tExit > t1) return null;
         nx = tExit === tx ? -stepX : 0;

@@ -20,7 +20,8 @@ import {
   type ClusterResult,
   type ClusterSpot,
 } from "@voxolith/gen-kit";
-import { registerGenerator, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { refinement, registerGenerator, type Entity, type EntityGenerator, type GenerateContext, type ParamSpec, type Vec3 } from "@voxolith/engine";
+import { fineBush } from "./fine";
 import { buildRoles, isLeaf, isWood, ROLE } from "./roles";
 import { cloneParams, REFERENCE_HEIGHT, type BushParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
@@ -48,7 +49,8 @@ export interface BushResult {
 // Season changes the palette behind these roles, not the roles themselves.
 const TONES: [number, number, number] = [ROLE.LEAF_HI, ROLE.LEAF_MID, ROLE.LEAF_LO];
 
-export function generateBush(params: BushParams, rng: () => number, id = "bush"): BushResult {
+/** Generate a bush; a finer `ctx.voxelsPerMetre` refines it (see fine.ts). */
+export function generateBush(params: BushParams, rng: () => number, id = "bush", ctx?: GenerateContext): BushResult {
   const t0 = performance.now();
   const p = cloneParams(params);
   const noise = makeNoise(Math.floor(rng() * 0x7fffffff) || 1);
@@ -174,7 +176,9 @@ export function generateBush(params: BushParams, rng: () => number, id = "bush")
     }
   }
 
-  const model = vol.crop(origin, buildRoles(skinFor(p.species, p.look.season)));
+  let model = vol.crop(origin, buildRoles(skinFor(p.species, p.look.season)));
+  const k = refinement(ctx);
+  if (k > 1) model = fineBush(model, skel, origin, k, Math.floor(rng() * 0x7fffffff));
   let woodFinal = 0;
   let leafFinal = 0;
   for (let i = 0; i < vol.data.length; i++) {
@@ -189,7 +193,7 @@ export function generateBush(params: BushParams, rng: () => number, id = "bush")
       id,
       kind: "bush",
       model,
-      meta: { species: p.species, season: p.look.season, height: p.shape.height, generator: "voxolith/gen-bush" },
+      meta: { species: p.species, season: p.look.season, height: p.shape.height, generator: "voxolith/gen-bush", ...(k > 1 ? { voxelsPerMetre: k * 10 } : {}) },
     },
     stats: {
       wood: woodFinal,
@@ -264,9 +268,11 @@ export const bushGenerator: EntityGenerator<BushParams> = {
   version: "0.1.0",
   description: "Multi-stemmed shrub: stems leaning out of the ground, leaf clumps, optional thorns and berries.",
   roles: buildRoles(skinFor("bush", "summer")),
+  looseRoles: [ROLE.LEAF_HI, ROLE.LEAF_MID, ROLE.LEAF_LO, ROLE.LEAF_EDGE, ROLE.LEAF_ACCENT, ROLE.LEAF_DEAD, ROLE.BLOSSOM, ROLE.BERRY, ROLE.SNOW, ROLE.THORN].map((v) => buildRoles(skinFor("bush", "summer"))[v - 1].id),
   defaults: PRESETS.bush,
   params: PARAMS,
-  generate: (params, rng) => generateBush(params, rng).entity,
+  generate: (params, rng, ctx) => generateBush(params, rng, undefined, ctx).entity,
+  scales: [100],
 };
 
 export const thicketGenerator: EntityGenerator<BushParams> = {

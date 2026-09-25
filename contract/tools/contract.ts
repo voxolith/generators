@@ -2,6 +2,7 @@
 //
 //   bun tools/contract.ts            all generators
 //   bun tools/contract.ts --quick    defaults only, no parameter sweep
+//   bun tools/contract.ts --fine     only the finer scales each generator offers
 //
 // What the engine and its hosts rely on (see @voxolith/engine EntityGenerator):
 // stable identity and roles, defaults inside their own ParamSpecs, pure and
@@ -39,6 +40,7 @@ registerBuildingGenerators();
 registerCreatureGenerators();
 
 const quick = process.argv.includes("--quick");
+const fineOnly = process.argv.includes("--fine");
 let failed = 0, checks = 0;
 const problems: string[] = [];
 const ok = (c: boolean, m: string, detail = "") => {
@@ -104,6 +106,57 @@ function largestPart(m: Entity["model"]): number {
   }
   return total ? best / total : 1;
 }
+
+/** Grounded fraction of a sparse model: voxels 6-connected to its lowest two layers of bricks' worth. */
+function groundedSparse(m: Entity["model"], loose: ReadonlySet<number>): { grounded: number; voxels: number } {
+  const sp = m.sparse!;
+  const { x: sx, y: sy, z: sz } = m.size;
+  const dx = Math.ceil(sx / 8), dy = Math.ceil(sy / 8);
+  // Loose roles (single leaves, petals) neither count nor carry the flood.
+  const get = (x: number, y: number, z: number) => {
+    if (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) return 0;
+    const b = sp.bricks.get((x >> 3) + (y >> 3) * dx + (z >> 3) * dx * dy);
+    const v = b ? b[(x & 7) + (y & 7) * 8 + (z & 7) * 64] : 0;
+    return loose.has(v) ? 0 : v;
+  };
+  const seen = new Map<number, Uint8Array>();
+  const mark = (x: number, y: number, z: number) => {
+    const key = (x >> 3) + (y >> 3) * dx + (z >> 3) * dx * dy;
+    let b = seen.get(key);
+    if (!b) seen.set(key, (b = new Uint8Array(512)));
+    const i = (x & 7) + (y & 7) * 8 + (z & 7) * 64;
+    if (b[i]) return false;
+    b[i] = 1;
+    return true;
+  };
+  let total = 0;
+  for (const b of sp.bricks.values()) for (let i = 0; i < 512; i++) if (b[i] && !loose.has(b[i])) total++;
+  let stack: number[] = [];
+  // Seeds: every solid voxel within the lowest tenth of the height (at least 2 layers).
+  const lowY = Math.max(2, Math.ceil(sy * 0.02));
+  for (const [key, b] of sp.bricks) {
+    const bx = key % dx, by = Math.floor(key / dx) % dy, bz = Math.floor(key / (dx * dy));
+    if (by * 8 >= lowY) continue;
+    for (let i = 0; i < 512; i++) {
+      if (!b[i] || loose.has(b[i])) continue;
+      const x = bx * 8 + (i & 7), y = by * 8 + ((i >> 3) & 7), z = bz * 8 + (i >> 6);
+      if (y < lowY && mark(x, y, z)) stack.push(x, y, z);
+    }
+  }
+  let reached = 0;
+  while (stack.length) {
+    const z = stack.pop()!, y = stack.pop()!, x = stack.pop()!;
+    reached++;
+    for (const [ex, ey, ez] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
+      if (get(x + ex, y + ey, z + ez) && mark(x + ex, y + ey, z + ez)) stack.push(x + ex, y + ey, z + ez);
+  }
+  stack = [];
+  return { grounded: total ? reached / total : 1, voxels: total };
+}
+
+/** Budgets for one model at a finer scale. */
+const FINE_MS = 20000;
+const FINE_BYTES = 96 * 1048576;
 
 function checkEntity(gen: EntityGenerator<unknown>, e: Entity, label: string, minGrounded: number) {
   const { x, y, z } = e.model.size;
@@ -185,8 +238,44 @@ for (const gen of listGenerators()) {
   const direct = gen.generate(structuredClone(gen.defaults), seededRandom(4242));
   ok(sameData(generateFromState(decodeState(code)), direct), "a share code rebuilds the same model");
 
+  // A context at the native scale changes nothing.
+  ok(sameData(gen.generate(structuredClone(gen.defaults), seededRandom(1234), { voxelsPerMetre: 10 }), a), "a context at the native 10 voxels per metre gives the same model");
+
+  // Finer scales: the same design, k times the size, sparse, within budget.
+  if (!quick || fineOnly)
+    for (const vpm of gen.scales ?? []) {
+      const k = Math.round(vpm / 10);
+      const tf = performance.now();
+      const f = gen.generate(structuredClone(gen.defaults), seededRandom(1234), { voxelsPerMetre: vpm });
+      const ms = performance.now() - tf;
+      const m = f.model, lab = `${vpm} vox/m`;
+      ok(!!m.sparse && m.data.length === 0, `${lab}: the model is sparse`);
+      if (!m.sparse) continue;
+      ok(m.size.x === a.model.size.x * k && m.size.y === a.model.size.y * k && m.size.z === a.model.size.z * k, `${lab}: ${k} times the native model's size`, `${m.size.x}x${m.size.y}x${m.size.z} vs ${a.model.size.x}x${a.model.size.y}x${a.model.size.z}`);
+      let max = 0;
+      for (const b of m.sparse.bricks.values()) for (let i = 0; i < 512; i++) if (b[i] > max) max = b[i];
+      ok(max > 0 && max <= m.roles.length, `${lab}: every voxel value is a declared role`, `max ${max}`);
+      const [ax, ay, az] = m.anchor;
+      ok(ax >= 0 && ax <= m.size.x && ay >= 0 && ay <= m.size.y && az >= 0 && az <= m.size.z && Math.abs(ax - a.model.anchor[0] * k) < 1e-6, `${lab}: anchor scaled with the model`);
+      const bytes = m.sparse.bricks.size * 288;
+      ok(ms < FINE_MS, `${lab}: generates within ${FINE_MS / 1000} s`, `${(ms / 1000).toFixed(1)} s`);
+      ok(bytes < FINE_BYTES, `${lab}: fits ${FINE_BYTES / 1048576} MB of GPU bricks`, `${(bytes / 1048576).toFixed(0)} MB`);
+      // Single leaves, petals and seed heads (the generator's looseRoles) may
+      // float at this scale; the structure may not.
+      const loose = new Set((gen.looseRoles ?? []).map((id) => m.roles.findIndex((r) => r.id === id) + 1).filter((v) => v > 0));
+      const g = groundedSparse(m, loose);
+      ok(g.grounded >= 0.99, `${lab}: nothing structural floats`, `${(100 - g.grounded * 100).toFixed(2)}% of ${g.voxels} voxels not connected to the base`);
+      if (!quick) {
+        const f2 = gen.generate(structuredClone(gen.defaults), seededRandom(1234), { voxelsPerMetre: vpm });
+        let same = f2.model.sparse!.bricks.size === m.sparse.bricks.size;
+        if (same) for (const [key, br] of m.sparse.bricks) { const o = f2.model.sparse!.bricks.get(key); if (!o || !o.every((v, i) => v === br[i])) { same = false; break; } }
+        ok(same, `${lab}: deterministic`);
+      }
+      console.log(`  ${lab}: ${m.size.x}x${m.size.y}x${m.size.z}, ${g.voxels} voxels, ${m.sparse.bricks.size} bricks (${(bytes / 1048576).toFixed(0)} MB), ${(ms / 1000).toFixed(1)} s, ${(g.grounded * 100).toFixed(2)}% of the structure grounded`);
+    }
+
   // Every parameter at its extremes still generates.
-  if (!quick) {
+  if (!quick && !fineOnly) {
     for (const spec of gen.params as ParamSpec[]) {
       const values: readonly unknown[] =
         spec.kind === "enum" ? spec.options : spec.kind === "bool" ? [false, true] : [spec.min, spec.max];
