@@ -7,7 +7,28 @@
 
 # @voxolith/gen-grass
 
-Procedural voxel ground cover for [Voxolith](https://github.com/voxolith/engine).
+Procedural voxel ground cover for [Voxolith](https://github.com/voxolith/engine). A patch is many
+independent blades, not one connected object: tufts scatter over a disc, each fans a handful of
+one-voxel blades out of the ground, and the look comes from how far they splay, how hard they arc
+and the dark-to-tip gradient along each. Presets `grass`, `meadow`, `reeds`, `fern` and `dry`; the
+guarantee is that every blade reaches the ground. Branch growth, clump placement, canopy carving
+and exposure shading come from [`@voxolith/gen-kit`](../kit), shared with the tree and bush
+generators. Generation is pure and deterministic, touches no filesystem, and returns an `Entity`
+whose voxels are colour role indices.
+
+## Install
+
+The package is **not on npm yet**. Until it is, clone
+[voxolith/generators](https://github.com/voxolith/generators) next to `voxolith/renderer` and
+`voxolith/engine` and link them from a bun workspace (`"@voxolith/gen-grass": "workspace:*"`); the
+[installation guide](https://voxolith.github.io/docs/getting-started/installation/) has the
+layout. Once published:
+
+```sh
+bun add @voxolith/gen-grass
+```
+
+## Quick start
 
 ```ts
 import { seededRandom } from "@voxolith/renderer/core";
@@ -16,24 +37,13 @@ import { generateGrass, PRESETS } from "@voxolith/gen-grass";
 const { entity, stats } = generateGrass(PRESETS.meadow, seededRandom(42));
 ```
 
-A patch is many independent blades, not one connected object. Tufts scatter
-over a disc, each tuft fans a handful of blades out of the ground, and every
-blade is a single stem one voxel thick that bends under its own weight. The
-look comes almost entirely from three things: how far blades splay from
-vertical, how hard they arc over, and the dark-to-tip gradient along each
-blade. Whole blades dry off rather than individual voxels, because speckling
-reads as noise instead of as a dry season.
+## Documentation
 
-Presets: `grass`, `meadow` (taller, with flower heads), `reeds` (upright, with
-seed heads), `fern` (arching fronds carrying leaflets), `dry`.
-
-Unlike a tree, the result is deliberately many pieces; the guarantee is that
-every blade reaches the ground.
-
-Branch growth, clump placement, canopy carving and exposure shading come from
-[`@voxolith/gen-kit`](../kit), shared with the
-tree and grass generators. Generation is pure and deterministic, touches no
-filesystem, and returns an `Entity` whose voxels are colour role indices.
+- [Grass](https://voxolith.github.io/docs/generators/grass/): presets, parameters, how it works, finer scales
+- [Using generators](https://voxolith.github.io/docs/generators/using-generators/): direct calls, the registry, workers, variant pools
+- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): the same patch at 50 or 100 voxels per metre
+- [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every generator is checked against
+- [API reference](https://voxolith.github.io/docs/generators/api/gen-grass/)
 
 ## Development
 

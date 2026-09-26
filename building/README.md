@@ -1,22 +1,33 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/voxolith/.github/main/profile/lockup-dark.svg">
+    <img alt="Voxolith — WebGPU voxel engine" src="https://raw.githubusercontent.com/voxolith/.github/main/profile/lockup.svg" width="420">
+  </picture>
+</p>
+
 # @voxolith/gen-building
 
 Procedural voxel buildings for [Voxolith](https://github.com/voxolith/engine). A small shape
 grammar lays out the mass (plinth, hollow storeys with floor slabs, a gable, hip or flat roof),
-then detail passes work over it at roughly 2.5 voxels to the foot:
+then detail passes work over it: walls in brick, ashlar, plaster or timber frame with real relief,
+trim, set-back windows with real glass, doors, roofs in tile, slate, shingle or thatch, chimneys
+and weathering. Presets `cottage`, `farmhouse`, `townhouse`, `tower` and `barn`. The wall styles
+and roofings are separate from the geometry, and colours come from 32 roles, so a house restyles
+by palette.
 
-- **Walls**: brick in running bond, ashlar courses of varying height, plaster that spalls to show
-  brick, or a timber frame with posts at every jamb and braced end bays. Mortar joints are recessed
-  and timbers stand proud, so the walls have relief rather than just colour.
-- **Trim**: quoins, string courses, a projecting plinth with a water table, a corniced parapet.
-- **Windows**: set back in a reveal, framed, with glazing bars, a proud sill, a lintel or soldier
-  course, slatted shutters and flower boxes. The glass is real glass to the renderer and a fraction
-  of it glows.
-- **Doors**: a panelled leaf with a glazed transom, handle and door case, or boarded barn doors
-  with Z braces; a hood on brackets, a lamp, and stone steps up the plinth.
-- **Roofs**: tile, slate or shingle laid in staggered courses with per-tile tone, or thatch with
-  streaks, ragged eaves and a ligger ridge. Ridge cap, barge boards, rafter tails, gutters and
-  downpipes; brick chimneys with a corbelled cap and hollow pots.
-- **Weather**: streaks under sills, rising damp, moss on roofs and plinth.
+## Install
+
+The package is **not on npm yet**. Until it is, clone
+[voxolith/generators](https://github.com/voxolith/generators) next to `voxolith/renderer` and
+`voxolith/engine` and link them from a bun workspace (`"@voxolith/gen-building": "workspace:*"`); the
+[installation guide](https://voxolith.github.io/docs/getting-started/installation/) has the
+layout. Once published:
+
+```sh
+bun add @voxolith/gen-building
+```
+
+## Quick start
 
 ```ts
 import { generateBuilding, PRESETS } from "@voxolith/gen-building";
@@ -25,11 +36,23 @@ import { seededRandom } from "@voxolith/renderer/core";
 const { entity } = generateBuilding(PRESETS.farmhouse, seededRandom(42));
 ```
 
-Presets: `cottage`, `farmhouse`, `townhouse`, `tower`, `barn`. The four wall styles and four
-roofings are separate from the geometry, and colours come from 32 roles, so a house restyles by
-palette.
+## Documentation
+
+- [Building](https://voxolith.github.io/docs/generators/building/): presets, parameters, how it works, finer scales
+- [Using generators](https://voxolith.github.io/docs/generators/using-generators/): direct calls, the registry, workers, variant pools
+- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): masonry, tiles and boards at real size at 50 or 100 voxels per metre
+- [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every generator is checked against
+- [API reference](https://voxolith.github.io/docs/generators/api/gen-building/)
+
+## Development
 
 ```sh
+bun install
 bun run verify              # connectivity, hollowness, openings, determinism, share codes
 bun run preview species     # contact sheets into previews/: species|roofs|walls|seeds|closeup
+bun run gen                 # bake .vox files into out/
 ```
+
+## License
+
+MIT

@@ -8,48 +8,65 @@
 # Voxolith generators
 
 Pluggable entity generators for [Voxolith](https://github.com/voxolith/engine). Each folder is its
-own npm package; they live together because they share an authoring toolkit,
-[`kit/`](kit), and are almost always changed together. Generators *bake* models; the engine only
-places and streams them and the renderer draws them.
+own package; they live together because they share an authoring toolkit, [`kit/`](kit), and are
+almost always changed together. Generators *bake* models; the engine only places and streams them
+and the renderer draws them. A generator is pure and deterministic: everything random comes from
+an injected rng, so the same parameters and seed always rebuild the same voxels, which is what
+lets a model be described by a short share code (try one in the
+[viewer](https://voxolith.github.io/viewer/)). Parameters are written in 10 voxels per metre, and
+every entity generator also builds the same design at 50 and 100.
 
 | folder | package | what it makes |
 |---|---|---|
-| [`kit/`](kit) | [`@voxolith/gen-kit`](https://www.npmjs.com/package/@voxolith/gen-kit) | the shared toolkit and the headless preview renderer |
-| [`tree/`](tree) | [`@voxolith/gen-tree`](https://www.npmjs.com/package/@voxolith/gen-tree) | broadleaf and conifer trees |
-| [`bush/`](bush) | [`@voxolith/gen-bush`](https://www.npmjs.com/package/@voxolith/gen-bush) | shrubs, thickets, brambles, hedges |
-| [`grass/`](grass) | [`@voxolith/gen-grass`](https://www.npmjs.com/package/@voxolith/gen-grass) | grass, meadow, reeds, ferns |
-| [`rock/`](rock) | [`@voxolith/gen-rock`](https://www.npmjs.com/package/@voxolith/gen-rock) | boulders, outcrops, pebbles |
-| [`building/`](building) | [`@voxolith/gen-building`](https://www.npmjs.com/package/@voxolith/gen-building) | cottages, farmhouses, townhouses, towers, barns |
-| [`creature/`](creature) | [`@voxolith/gen-creature`](https://www.npmjs.com/package/@voxolith/gen-creature) | rigged, animated rats with layered internals |
-| [`terrain/`](terrain) | [`@voxolith/gen-terrain`](https://www.npmjs.com/package/@voxolith/gen-terrain) | hills, a meandering river and lakes, streamed a brick at a time |
+| [`kit/`](kit) | `@voxolith/gen-kit` | the shared toolkit and the headless preview renderer |
+| [`tree/`](tree) | `@voxolith/gen-tree` | broadleaf and conifer trees |
+| [`bush/`](bush) | `@voxolith/gen-bush` | shrubs, thickets, brambles, hedges |
+| [`grass/`](grass) | `@voxolith/gen-grass` | grass, meadow, reeds, ferns |
+| [`rock/`](rock) | `@voxolith/gen-rock` | boulders, outcrops, pebbles |
+| [`building/`](building) | `@voxolith/gen-building` | cottages, farmhouses, townhouses, towers, barns |
+| [`creature/`](creature) | `@voxolith/gen-creature` | rigged, animated rats with layered internals |
+| [`terrain/`](terrain) | `@voxolith/gen-terrain` | hills, a meandering river and lakes, streamed a brick at a time |
 
-A generator is pure and deterministic: everything random comes from an injected rng, so the same
-parameters and seed always rebuild the same voxels. That is what lets a model be described by a
-short share code — try one in the [viewer](https://voxolith.github.io/viewer/).
+## Install
+
+The packages are **not on npm yet**. Until they are, clone this repo next to `voxolith/renderer`
+and `voxolith/engine` and link them from a bun workspace that lists `generators/*`; the
+[installation guide](https://voxolith.github.io/docs/getting-started/installation/) has the
+layout. Once published, add the ones you use:
+
+```sh
+bun add @voxolith/gen-tree @voxolith/gen-terrain
+```
+
+## Quick start
 
 ```ts
 import { generateTree, PRESETS } from "@voxolith/gen-tree";
 import { seededRandom } from "@voxolith/renderer/core";
 
 const { entity } = generateTree(PRESETS.oak, seededRandom(42));
+// The same design at 100 voxels per metre, as a sparse model for renderer.addModel / setInstances:
+const fine = generateTree(PRESETS.oak, seededRandom(42), "oak", { voxelsPerMetre: 100 }).entity;
 ```
 
-## Finer scales
+## Documentation
 
-Parameters are written in 10 voxels per metre. Every entity generator also builds at 50 and 100
-(`generate(params, rng, { voxelsPerMetre: 100 })`, listed in its `scales`): the same design,
-built at its native scale and then refined by gen-kit's `refine` with the generator's own
-rules. Trees, bushes and grass redraw their limbs and blades from their skeletons, thinner than
-a coarse voxel allows, with single leaves or needles in the coarse shading; buildings get bricks,
-stone courses, tiles, slates, thatch, boards and planks at real size (their rooms are skipped);
-rocks round off with grain and hairline cracks. The creature is already authored near that
-scale; `atScale` sizes it. Results are sparse models of a few to a few tens of MB of GPU bricks,
-in 0.1 to 3 seconds each.
+The long-form material lives on the documentation site, in the
+[generators section](https://voxolith.github.io/docs/generators/), with a page per generator:
 
-```ts
-const oak = generateTree(PRESETS.oak, seededRandom(42), "oak", { voxelsPerMetre: 100 }).entity;
-oak.model.sparse; // 8^3 bricks; draw with renderer.addModel / setInstances
-```
+- [Using generators](https://voxolith.github.io/docs/generators/using-generators/): direct calls, the registry, presets, workers, variant pools
+- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): how a 10 vox/m design becomes a sparse model at 50 or 100
+- [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every registered generator is checked against
+- [Share codes](https://voxolith.github.io/docs/generators/share-codes/)
+- [The toolkit](https://voxolith.github.io/docs/generators/gen-kit/) and [Writing a generator](https://voxolith.github.io/docs/generators/gen-kit/writing-a-generator/)
+- API reference per package: [gen-kit](https://voxolith.github.io/docs/generators/api/gen-kit/),
+  [gen-tree](https://voxolith.github.io/docs/generators/api/gen-tree/),
+  [gen-bush](https://voxolith.github.io/docs/generators/api/gen-bush/),
+  [gen-grass](https://voxolith.github.io/docs/generators/api/gen-grass/),
+  [gen-rock](https://voxolith.github.io/docs/generators/api/gen-rock/),
+  [gen-building](https://voxolith.github.io/docs/generators/api/gen-building/),
+  [gen-creature](https://voxolith.github.io/docs/generators/api/gen-creature/),
+  [gen-terrain](https://voxolith.github.io/docs/generators/api/gen-terrain/)
 
 ## Working on them
 
@@ -63,26 +80,14 @@ bun run verify           # headless checks: connectivity, determinism, share cod
 bun run --cwd tree preview species   # contact sheets into tree/previews/
 ```
 
-## The contract
-
-[`contract/`](contract) (private, not published) checks every registered generator against
-what the engine relies on: namespaced id and semver version, unique roles with colours in
-0..1, defaults inside their own ParamSpecs, the same seed giving the same voxels (even after
-other calls), params never mutated, voxel values within the declared roles, the anchor inside
-the model, nothing floating (every voxel connected to the base), share codes rebuilding the
-same model, and every parameter at its min, max and each enum option still generating. At each
-finer scale a generator lists, the model must be sparse, exactly k times the native size,
-deterministic, within its roles, with the anchor scaled, its structure grounded (the
-`looseRoles`, single leaves and petals, may float), within 20 s and 96 MB of GPU bricks.
+[`contract/`](contract) (private, not published) checks every registered entity generator against
+what the engine relies on; `gen-terrain` describes a region, not a model, and has its own checks.
 
 ```sh
 bun run --cwd contract verify    # quick: defaults only (part of `bun run check`)
 bun run --cwd contract full      # every parameter extreme and every finer scale (CI)
 bun run --cwd contract fine      # defaults at the finer scales only
 ```
-
-`gen-terrain` is not an entity generator and is not covered: it describes a region (a
-heightfield and water), takes a seed rather than an rng, and has its own checks.
 
 ## Releasing
 

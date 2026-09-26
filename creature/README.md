@@ -1,43 +1,37 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/voxolith/.github/main/profile/lockup-dark.svg">
+    <img alt="Voxolith — WebGPU voxel engine" src="https://raw.githubusercontent.com/voxolith/.github/main/profile/lockup.svg" width="420">
+  </picture>
+</p>
+
 # @voxolith/gen-creature
 
-Rigged, animated voxel creatures for [Voxolith](https://github.com/voxolith/engine). A rat
-first; other small quadrupeds follow from the same shape and different parameters.
+Rigged, animated voxel creatures for [Voxolith](https://github.com/voxolith/engine). A rat first;
+other small quadrupeds follow from the same shape and different parameters. The entity is a
+rest-pose model whose voxels each know their bone, a 26-bone rig and generated clips (`walk`,
+`turn-left`, `turn-right`, `run`, `idle`, `sniff`, `death`), played, blended and baked with
+[`@voxolith/engine/animation`](https://voxolith.github.io/docs/engine/animation/). Under the fur
+there is fat, flesh, muscle, a skeleton and organs, out of sight until `wound` carves the model or
+`sever` takes a limb off. The presets are stylised game rats; `atScale(params, voxelsPerMetre)`
+sizes one for a world with a fixed unit.
 
-The entity is a rest-pose model whose voxels each know their bone, a 26-bone rig (pelvis,
-spine, chest, neck, head, ears, a 7-bone tail, three bones per leg) and generated clips: `walk`,
-`turn-left`, `turn-right`, `run`, `idle`, `sniff`, `death`. Play, blend and bake them with
-[`@voxolith/engine/animation`](https://github.com/voxolith/engine#animation).
+## Install
 
-Under the fur there is fat, flesh and muscle by depth, a skeleton down the spine, legs and tail,
-a skull around a brain, lungs and a heart in the chest and a gut in the belly — out of sight
-until `wound` carves the model or `sever` takes a limb off. When a pose uncovers flesh that was
-buried at rest (under a swinging haunch), the rig's `cover` table draws it as fur, so only
-damage ever shows the inside.
+The package is **not on npm yet**. Until it is, clone
+[voxolith/generators](https://github.com/voxolith/generators) next to `voxolith/renderer` and
+`voxolith/engine` and link them from a bun workspace (`"@voxolith/gen-creature": "workspace:*"`); the
+[installation guide](https://voxolith.github.io/docs/getting-started/installation/) has the
+layout. Once published:
 
-## Resolution
+```sh
+bun add @voxolith/gen-creature
+```
 
-Chosen so it animates without losing the voxel look:
-- nothing animated is thinner than 2 voxels, except the tail's last third;
-- at least 4 voxels between joints, so a 15° bend moves a limb end by a voxel;
-- the detail budget goes to the head (eyes, ears, snout, incisors), the body stays simple masses;
-- legs are longer than a real rat's (`legLength` 1.5): a real rat's legs hide under its belly,
-  and a gait nobody can see does not read.
-
-The default rat is about 3.5k voxels, 26 bones, and bakes a posed model in about 2 ms.
-
-## Real scale
-
-The presets are stylised game rats: 75 voxels nose to tail tip at `size` 1.2, which is right
-beside a 10 voxels/metre house but a 75 cm rat in a 1 cm world. `atScale(params, voxelsPerMetre)`
-sizes any preset for a world with a fixed unit, keeping the presets' ratios: at 100 vox/m the
-rat comes out at size 0.8, 49 voxels (a large brown rat, about 50 cm).
-
-Small rats are where the resolution rules bite, so below size 1 the body keeps floors: lower
-legs and feet stay over 2 voxels across, the first part of the tail over 1.5; there is no fat
-layer, and bone and organs sit one voxel shallower so a wound still shows them. `verify` runs
-every clip and damage check at both the preset size and the 100 vox/m size.
+## Quick start
 
 ```ts
+import { seededRandom } from "@voxolith/renderer/core";
 import { generateCreature, PRESETS } from "@voxolith/gen-creature";
 import { bakePose, makeAnimator, poseMatrices } from "@voxolith/engine/animation";
 
@@ -47,7 +41,23 @@ anim.update(dt);
 const posed = bakePose(entity.model, entity.rig!, poseMatrices(entity.rig!, anim.pose()), { yaw });
 ```
 
+## Documentation
+
+- [Creature](https://voxolith.github.io/docs/generators/creature/): rig and clips, the inside, resolution rules, real scale, presets
+- [Animation](https://voxolith.github.io/docs/engine/animation/): playing, posing, baking and damage in the engine
+- [Stamping and crowds](https://voxolith.github.io/docs/engine/stamping-and-crowds/): many animated rats on a budget, and what they cost
+- [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every generator is checked against
+- [API reference](https://voxolith.github.io/docs/generators/api/gen-creature/)
+
+## Development
+
 ```sh
+bun install
 bun run verify              # binding, hidden interior, chest slice, every clip in one piece, footfalls, damage
 bun run preview species     # also: cut, clips, walk, turns; --scale 100 for the real-size rat
+bun run bench               # crowd update and brick edits per frame, headless
 ```
+
+## License
+
+MIT
