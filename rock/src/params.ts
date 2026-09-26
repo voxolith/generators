@@ -8,6 +8,7 @@
 // Split as elsewhere: `shape` decides which voxels exist, `look` only decides
 // which role each surface voxel gets.
 
+/** Which voxels exist: the main mass, its surface, its fractures and any extra rocks. */
 export interface ShapeParams {
   /** Longest horizontal extent, in voxels. */
   size: number;
@@ -42,6 +43,7 @@ export interface ShapeParams {
   sink: number;
 }
 
+/** Which role each surface voxel gets; interior voxels stay the mid tone. */
 export interface LookParams {
   /** Contrast between the light and dark tones, 0..1. */
   mottle: number;
@@ -63,12 +65,18 @@ export interface LookParams {
   snow: number;
 }
 
+/**
+ * Everything a rock is made from. Presets in {@link PRESETS}; the generators expose every field
+ * as a ParamSpec except the extras' size spread.
+ */
 export interface RockParams {
+  /** Stone name, which picks the colour skin: granite, sandstone, basalt, limestone or slate. */
   species: string;
   shape: ShapeParams;
   look: LookParams;
 }
 
+/** Copy of the params, so presets are never mutated by a caller. */
 export function cloneParams(p: RockParams): RockParams {
   return { species: p.species, shape: { ...p.shape }, look: { ...p.look } };
 }

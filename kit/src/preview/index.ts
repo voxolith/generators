@@ -1,7 +1,11 @@
-// @voxolith/gen-kit/preview — headless CPU rendering for generator work.
-//
-// Node/bun only: the PNG writer uses node:zlib. Use it from tools, not from a
-// browser bundle.
+/**
+ * @voxolith/gen-kit/preview: headless CPU rendering for generator work.
+ *
+ * Node/bun only: the PNG writer uses node:zlib. Use it from tools, not from a
+ * browser bundle.
+ *
+ * @packageDocumentation
+ */
 
 export { renderEntity, renderModel } from "./render";
 export type { RenderOptions, RenderResult } from "./render";

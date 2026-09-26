@@ -12,13 +12,17 @@
 import { OccupancyGrid, COARSE_B } from "@voxolith/renderer/core";
 import type { Entity, EntityModel, RGB, Vec3 } from "@voxolith/engine";
 
+/** Image size, camera, light and colouring for {@link renderModel}; every field is optional. */
 export interface RenderOptions {
+  /** Image width in pixels. Default 420. */
   width?: number;
+  /** Image height in pixels. Default 560. */
   height?: number;
   /** Orbit angle in degrees; 0 looks along +Z. */
   yawDeg?: number;
   /** Elevation in degrees above the horizon. */
   pitchDeg?: number;
+  /** Vertical field of view in degrees. */
   fovDeg?: number;
   /** >1 pulls the camera back, <1 pushes in. */
   zoom?: number;
@@ -26,12 +30,17 @@ export interface RenderOptions {
   aimY?: number;
   /** Look-at offset in voxels, applied after aimY (for close-ups). */
   aimOffset?: Vec3;
+  /** Direction towards the sun. */
   sun?: Vec3;
+  /** Cast a sun shadow ray per hit. Default true. */
   shadows?: boolean;
+  /** Darken voxel faces by their occluded neighbours. Default true. */
   ao?: boolean;
+  /** Draw a ground plane at the bottom of the model's box, taking its shadow. Default true. */
   ground?: boolean;
   /** Sky gradient, top then horizon. */
   sky?: [RGB, RGB];
+  /** The ground plane's two checker colours (8-voxel squares). */
   groundColor?: [RGB, RGB];
   /** Replace the model's own role colours. */
   palette?: RGB[];
@@ -39,11 +48,13 @@ export interface RenderOptions {
   flat?: RGB;
 }
 
+/** An 8-bit RGB image, a render or a {@link contactSheet}; write it with {@link encodePng}. */
 export interface RenderResult {
   width: number;
   height: number;
   /** Row-major RGB triples. */
   rgb: Uint8Array;
+  /** Time spent rendering (for a sheet, the sum over its cells). */
   ms: number;
 }
 
@@ -66,10 +77,32 @@ const cross = (a: Vec3, b: Vec3): Vec3 => [
   a[0] * b[1] - a[1] * b[0],
 ];
 
+/**
+ * Render an entity's model on the CPU, as the GPU would roughly show it: sun shadows, face
+ * ambient occlusion, a ground plane and a sky. For judging generator output in headless tools.
+ *
+ * @param entity - A generated entity; only its model is drawn (rest pose for a rigged one).
+ * @param opts - Image size, camera and lighting.
+ * @returns The image as row-major RGB.
+ * @example
+ * ```ts
+ * import { seededRandom } from "@voxolith/renderer/core";
+ * import { encodePng, renderEntity } from "@voxolith/gen-kit/preview";
+ * import { generateTree, PRESETS } from "@voxolith/gen-tree";
+ *
+ * const { entity } = generateTree(PRESETS.oak, seededRandom(1));
+ * const img = renderEntity(entity, { width: 300, height: 400, yawDeg: 34, pitchDeg: 8 });
+ * await Bun.write("oak.png", encodePng(img.width, img.height, img.rgb));
+ * ```
+ */
 export function renderEntity(entity: Entity, opts: RenderOptions = {}): RenderResult {
   return renderModel(entity.model, opts);
 }
 
+/**
+ * Render a model, dense or sparse, with a DDA raymarcher over its own grid. The camera orbits the
+ * model's centre at `yawDeg` and `pitchDeg`, framed to fit; see {@link renderEntity}.
+ */
 export function renderModel(model: EntityModel, opts: RenderOptions = {}): RenderResult {
   const t0 = performance.now();
   const W = opts.width ?? 420;

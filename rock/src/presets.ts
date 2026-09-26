@@ -15,6 +15,10 @@ const SKINS: Record<string, Skin> = {
   slate:     { light: "6f7a86", mid: "525b66", dark: "3a414a", strata: "5e6873", crack: "22272d" },
 };
 
+/**
+ * Default role colours for a stone: its light, mid and dark tones, strata and cracks, a damp
+ * base mixed from them, and shared moss, lichen and snow. Unknown stones fall back to granite.
+ */
 export function skinFor(species: string): ColorSet {
   const s = SKINS[species] ?? SKINS.granite;
   return {
@@ -88,8 +92,13 @@ export const PEBBLES: RockParams = derive(BOULDER, "granite", (p) => {
   p.look.moss = 0.15; p.look.lichen = 0.1; p.look.cracks = 0.1;
 });
 
+/**
+ * Tuned rocks by name: `boulder`, `sandstone`, `basalt`, `limestone`, `mossy`, `outcrop` and
+ * `pebbles`. Each is a complete {@link RockParams}; clone before editing (see {@link cloneParams}).
+ */
 export const PRESETS: Record<string, RockParams> = {
   boulder: BOULDER, sandstone: SANDSTONE, basalt: BASALT, limestone: LIMESTONE,
   mossy: MOSSY, outcrop: OUTCROP, pebbles: PEBBLES,
 };
+/** The keys of {@link PRESETS}, in declaration order. */
 export const PRESET_NAMES = Object.keys(PRESETS);

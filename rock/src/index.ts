@@ -1,13 +1,17 @@
-// @voxolith/gen-rock — procedural voxel rocks and boulders.
-//
-// A rock is a noise-displaced superellipsoid (`blob` from the engine's
-// authoring toolkit), optionally with smaller rocks tumbled against it, and a
-// surface pass that hands out roles: mottled base tones, sedimentary strata on
-// a tilted bedding plane, cracks where a noise field crosses zero, moss on the
-// upward faces, lichen patches anywhere, a damp band at the base, snow on top.
-//
-// Interior voxels are left as the mid tone; the renderer never sees them, but a
-// game that breaks a rock open will.
+/**
+ * @voxolith/gen-rock: procedural voxel rocks and boulders.
+ *
+ * A rock is a noise-displaced superellipsoid (`blob` from @voxolith/gen-kit,
+ * the authoring toolkit), optionally with smaller rocks tumbled against it, and a
+ * surface pass that hands out roles: mottled base tones, sedimentary strata on
+ * a tilted bedding plane, cracks where a noise field crosses zero, moss on the
+ * upward faces, lichen patches anywhere, a damp band at the base, snow on top.
+ *
+ * Interior voxels are left as the mid tone; the renderer never sees them, but a
+ * game that breaks a rock open will.
+ *
+ * @packageDocumentation
+ */
 
 import { blob, facet, makeNoise, Volume, type Noise } from "@voxolith/gen-kit";
 import { refinement, registerGenerator, type GenerateContext, type Entity, type EntityGenerator, type ParamSpec, type Vec3 } from "@voxolith/engine";
@@ -16,22 +20,54 @@ import { buildRoles, ROLE } from "./roles";
 import { cloneParams, type RockParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
 
+/** Counts and timing from one {@link generateRock} call. Voxel counts are coarse. */
 export interface RockStats {
   total: number;
+  /** Voxels on the surface, the ones the look pass painted. */
   surface: number;
+  /** Rocks in the piece, the main mass included. */
   rocks: number;
+  /** Surface voxels painted as moss, and as cracks. */
   moss: number;
   cracks: number;
+  /** Model size in voxels (at a finer scale, the refined size). */
   size: { x: number; y: number; z: number };
+  /** Wall-clock generation time. */
   ms: number;
 }
 
+/** What {@link generateRock} returns: the entity and its stats. */
 export interface RockResult {
   entity: Entity;
   stats: RockStats;
 }
 
-/** A finer `ctx.voxelsPerMetre` refines the result (see fine.ts). */
+/**
+ * Generate a rock: a noise-displaced superellipsoid cleaved by fracture planes, with any extra
+ * rocks shaped the same way and tumbled against it so the piece stays connected, then a surface
+ * pass for tones, strata, cracks, moss, lichen, damp and snow. Pure and deterministic in its
+ * params and rng.
+ *
+ * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design comes back refined:
+ * a sparse model k times the size with a rounded, grainy surface and hairline cracks.
+ *
+ * @param params - The rock; not mutated. Start from a {@link PRESETS} entry.
+ * @param rng - Source of all randomness, returning 0..1 (e.g. `seededRandom(seed)`).
+ * @param id - The entity id.
+ * @param ctx - Optional scale; omitted or 10 voxels per metre gives the coarse model.
+ * @returns The entity (kind `rock`, anchored at its bottom centre raised by `shape.sink`, so it
+ * sits partly in the ground) and stats.
+ * @example
+ * ```ts
+ * import { seededRandom } from "@voxolith/renderer/core";
+ * import { cloneParams, generateRock, PRESETS } from "@voxolith/gen-rock";
+ *
+ * const p = cloneParams(PRESETS.boulder);
+ * p.species = "sandstone";
+ * p.look.strata = 6;
+ * const { entity } = generateRock(p, seededRandom(5));
+ * ```
+ */
 export function generateRock(params: RockParams, rng: () => number, id = "rock", ctx?: GenerateContext): RockResult {
   const t0 = performance.now();
   const p = cloneParams(params);
@@ -214,29 +250,30 @@ const band0 = (a: number) => Math.floor(a * 3) * 0.37;
 // --- generator registration ------------------------------------------------
 
 const PARAMS: ParamSpec[] = [
-  { path: "shape.size", label: "Size", kind: "int", min: 8, max: 160, group: "Shape" },
-  { path: "shape.aspect", label: "Height ratio", kind: "number", min: 0.2, max: 1.4, step: 0.05, group: "Shape" },
-  { path: "shape.elongation", label: "Depth ratio", kind: "number", min: 0.4, max: 1.4, step: 0.05, group: "Shape" },
+  { path: "shape.size", label: "Size", kind: "int", min: 8, max: 160, group: "Shape", help: "longest horizontal extent of the main rock, in voxels (10 per metre)" },
+  { path: "shape.aspect", label: "Height ratio", kind: "number", min: 0.2, max: 1.4, step: 0.05, group: "Shape", help: "height as a fraction of size: 1 is as tall as wide, 0.4 a slab" },
+  { path: "shape.elongation", label: "Depth ratio", kind: "number", min: 0.4, max: 1.4, step: 0.05, group: "Shape", help: "depth as a fraction of size; below 1 the footprint is an oval" },
   { path: "shape.exponent", label: "Angularity", kind: "number", min: 1.6, max: 9, step: 0.1, group: "Shape", help: "2 is round, 4 a rounded block, 8 nearly cubic" },
-  { path: "shape.roughness", label: "Roughness", kind: "number", min: 0, max: 0.4, step: 0.01, group: "Shape" },
-  { path: "shape.detail", label: "Bump size", kind: "number", min: 0.5, max: 5, step: 0.1, group: "Shape" },
+  { path: "shape.roughness", label: "Roughness", kind: "number", min: 0, max: 0.4, step: 0.01, group: "Shape", help: "surface displacement as a fraction of radius; higher is lumpier" },
+  { path: "shape.detail", label: "Bump size", kind: "number", min: 0.5, max: 5, step: 0.1, group: "Shape", help: "bumps per radius: low is a few great lumps, high many finer ones" },
   { path: "shape.facets", label: "Fractures", kind: "int", min: 0, max: 20, group: "Shape", help: "flat broken faces; 0 is a water-worn cobble" },
-  { path: "shape.facetDepth", label: "Fracture depth", kind: "number", min: 0.08, max: 0.5, step: 0.01, group: "Shape" },
+  { path: "shape.facetDepth", label: "Fracture depth", kind: "number", min: 0.08, max: 0.5, step: 0.01, group: "Shape", help: "most of the rock one fracture can shear away, as a fraction; higher cuts deeper faces" },
   { path: "shape.grit", label: "Grit", kind: "number", min: 0, max: 2.5, step: 0.1, group: "Shape", help: "fine surface texture; breaks up terracing" },
-  { path: "shape.cluster", label: "Extra rocks", kind: "int", min: 0, max: 10, group: "Shape" },
-  { path: "shape.clusterScale", label: "Extra size", kind: "number", min: 0.15, max: 0.9, step: 0.01, group: "Shape" },
-  { path: "shape.sink", label: "Sink", kind: "number", min: 0, max: 0.5, step: 0.01, group: "Shape" },
-  { path: "species", label: "Stone", kind: "enum", options: ["granite", "sandstone", "basalt", "limestone", "slate"], group: "Look" },
-  { path: "look.mottle", label: "Mottle", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
-  { path: "look.strata", label: "Strata bands", kind: "number", min: 0, max: 12, step: 0.5, group: "Look" },
-  { path: "look.strataTiltDeg", label: "Strata tilt", kind: "number", min: -45, max: 45, step: 1, group: "Look" },
-  { path: "look.cracks", label: "Cracks", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
-  { path: "look.moss", label: "Moss", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
-  { path: "look.lichen", label: "Lichen", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
-  { path: "look.wet", label: "Wet base", kind: "number", min: 0, max: 0.5, step: 0.01, group: "Look" },
-  { path: "look.snow", label: "Snow", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
+  { path: "shape.cluster", label: "Extra rocks", kind: "int", min: 0, max: 10, group: "Shape", help: "smaller rocks nestled against the main one, overlapping so the whole stays one piece" },
+  { path: "shape.clusterScale", label: "Extra size", kind: "number", min: 0.15, max: 0.9, step: 0.01, group: "Shape", help: "size of the extra rocks as a fraction of the main one" },
+  { path: "shape.sink", label: "Sink", kind: "number", min: 0, max: 0.5, step: 0.01, group: "Shape", help: "fraction of the height buried: the anchor sits this far up the rock" },
+  { path: "species", label: "Stone", kind: "enum", options: ["granite", "sandstone", "basalt", "limestone", "slate"], group: "Look", help: "stone colouring: granite, sandstone, basalt, limestone or slate" },
+  { path: "look.mottle", label: "Mottle", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "contrast between the light and dark tones across the surface" },
+  { path: "look.strata", label: "Strata bands", kind: "number", min: 0, max: 12, step: 0.5, group: "Look", help: "bedding bands per rock height; 0 disables banding" },
+  { path: "look.strataTiltDeg", label: "Strata tilt", kind: "number", min: -45, max: 45, step: 1, group: "Look", help: "tilt of the bedding planes in degrees" },
+  { path: "look.cracks", label: "Cracks", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "dark cracks over the surface; higher widens them, 0 for none" },
+  { path: "look.moss", label: "Moss", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "moss cover on upward-facing surfaces" },
+  { path: "look.lichen", label: "Lichen", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "pale lichen patches on any face" },
+  { path: "look.wet", label: "Wet base", kind: "number", min: 0, max: 0.5, step: 0.01, group: "Look", help: "height of the dark damp band at the base, as a fraction of height" },
+  { path: "look.snow", label: "Snow", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "snow cover on upward-facing surfaces" },
 ];
 
+/** The `voxolith/rock` generator: a single boulder, defaults {@link PRESETS}.boulder. */
 export const rockGenerator: EntityGenerator<RockParams> = {
   id: "voxolith/rock",
   name: "Rock",
@@ -249,6 +286,7 @@ export const rockGenerator: EntityGenerator<RockParams> = {
   scales: [50, 100],
 };
 
+/** The `voxolith/outcrop` generator: a main mass with extras, defaults {@link PRESETS}.outcrop. */
 export const outcropGenerator: EntityGenerator<RockParams> = {
   ...rockGenerator,
   id: "voxolith/outcrop",
@@ -257,6 +295,7 @@ export const outcropGenerator: EntityGenerator<RockParams> = {
   defaults: PRESETS.outcrop,
 };
 
+/** Register the rock and outcrop generators with the engine registry. */
 export function registerRockGenerators(): void {
   registerGenerator(rockGenerator);
   registerGenerator(outcropGenerator);
@@ -266,3 +305,4 @@ export { PRESETS, PRESET_NAMES, skinFor } from "./presets";
 export { ROLE, buildRoles } from "./roles";
 export { cloneParams } from "./params";
 export type { RockParams, ShapeParams, LookParams } from "./params";
+export type { ColorSet } from "./roles";

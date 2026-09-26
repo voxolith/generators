@@ -16,13 +16,37 @@ import type { Bone, EntityModel, Rig, Role, Vec3 } from "@voxolith/engine";
 import { capsule, ellipsoid, line3, type FillOptions } from "./shapes";
 import { Volume } from "./volume";
 
+/**
+ * A {@link Volume} that also records which bone owns each voxel, for rigged models.
+ *
+ * Every fill names a bone and later fills take ownership of what they overwrite: fill a parent's
+ * mass, then the child's with a ball at its head, and the joint belongs to the child and turns
+ * about its pivot without opening a gap. {@link RiggedVolume.layerInterior} then gives the mass
+ * an inside by depth, and {@link RiggedVolume.crop} returns the model with its bone binding and
+ * the rig in the same space. At most 255 bones.
+ *
+ * @example
+ * ```ts
+ * const FUR = 1, FAT = 2, FLESH = 3; // role indices into `roles`
+ * const r = new RiggedVolume(24, 16, 40);
+ * const body = r.bone("body", null, [12, 8, 8], [12, 8, 24]);
+ * const head = r.bone("head", "body", [12, 8, 24], [12, 8, 32]);
+ * r.capsule(body, [12, 8, 8], [12, 8, 24], 5, 4, FUR);
+ * r.ellipsoid(head, [12, 8, 28], [4, 4, 5], FUR); // overlaps the neck, so owns the joint
+ * r.layerInterior([FUR, FAT, FLESH]);
+ * const { model, rig } = r.crop([12, 0, 16], roles);
+ * ```
+ */
 export class RiggedVolume {
+  /** The voxels themselves; read and paint it like any volume. */
   readonly vol: Volume;
   /** Bone index per voxel, parallel to `vol.data`. */
   readonly owner: Uint8Array;
+  /** Bones in creation order, parents before children, in volume space. */
   readonly bones: Bone[] = [];
   private readonly ids = new Map<string, number>();
 
+  /** An empty volume of the given size with no bones. */
   constructor(sx: number, sy: number, sz: number) {
     this.vol = new Volume(sx, sy, sz);
     this.owner = new Uint8Array(this.vol.data.length);
@@ -40,6 +64,7 @@ export class RiggedVolume {
     return i;
   }
 
+  /** Index of a bone by id; throws when there is none. */
   index(id: string): number {
     const i = this.ids.get(id);
     if (i === undefined) throw new Error(`no bone "${id}"`);
@@ -57,10 +82,12 @@ export class RiggedVolume {
     return capsule(this.vol, a, b, ra, rb, value, this.tag(bone, o));
   }
 
+  /** Axis-aligned ellipsoid owned by `bone`; see the free `ellipsoid`. */
   ellipsoid(bone: number, c: Vec3, r: Vec3, value: number, keep?: (x: number, y: number, z: number, d: number) => boolean, o?: FillOptions): number {
     return ellipsoid(this.vol, c, r, value, keep, this.tag(bone, o));
   }
 
+  /** 6-connected DDA line owned by `bone`; see `line3`. */
   line(bone: number, a: Vec3, b: Vec3, value: number, o?: FillOptions): number {
     return line3(this.vol, a, b, value, this.tag(bone, o));
   }

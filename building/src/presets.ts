@@ -20,6 +20,11 @@ const ROOFS: Record<RoofStyle, { roof: string; dark: string; light: string; ridg
   shingle: { roof: "6e5a48", dark: "4b3d30", light: "85705b", ridge: "3d3127" },
 };
 
+/**
+ * Default role colours for a wall style and a roof covering: walls, mortar, trim, timber, shutters
+ * and door from the wall style, the roof tones and ridge from the covering, and shared glass,
+ * chimney, foundation, moss and flower colours.
+ */
 export function skinFor(wall: WallStyle, roof: RoofStyle): ColorSet {
   const w = WALLS[wall] ?? WALLS.plaster;
   const r = ROOFS[roof] ?? ROOFS.tile;
@@ -83,5 +88,10 @@ export const BARN: BuildingParams = derive(COTTAGE, "barn", (p) => {
   p.look.wall = "timber"; p.look.roofStyle = "shingle"; p.look.beamSpacing = 12; p.look.lit = 0; p.look.weathering = 0.7; p.look.spalling = 0; p.look.gutters = true;
 });
 
+/**
+ * Tuned buildings by name: `cottage`, `farmhouse`, `townhouse`, `tower` and `barn`. Each is a
+ * complete {@link BuildingParams}; clone before editing (see {@link cloneParams}).
+ */
 export const PRESETS: Record<string, BuildingParams> = { cottage: COTTAGE, farmhouse: FARMHOUSE, townhouse: TOWNHOUSE, tower: TOWER, barn: BARN };
+/** The keys of {@link PRESETS}, in declaration order. */
 export const PRESET_NAMES = Object.keys(PRESETS);

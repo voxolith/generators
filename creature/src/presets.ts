@@ -8,6 +8,10 @@ const coats: Record<Coat, { fur: [number, number, number]; dark: [number, number
   black: { fur: [0.16, 0.15, 0.15], dark: [0.1, 0.1, 0.1], light: [0.24, 0.23, 0.22], belly: [0.3, 0.28, 0.27] },
 };
 
+/**
+ * Default role colours for a coat: fur tones and a belly mixed towards the coat's light belly
+ * colour by `belly` (0..1), eyes red when `redEyes`, and shared skin, claw and interior colours.
+ */
 export function skinFor(coat: Coat, redEyes: boolean, belly: number): ColorSet {
   const c = coats[coat] ?? coats.brown;
   const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t) as [number, number, number];
@@ -37,6 +41,10 @@ const derive = (species: string, patch: (p: CreatureParams) => void): CreaturePa
   return p;
 };
 
+/**
+ * Tuned creatures by name: `rat`, `grey rat`, `lab rat`, `black rat` and `fat rat`. Stylised and
+ * larger than life; size one for a fixed-scale world with {@link atScale}.
+ */
 export const PRESETS: Record<string, CreatureParams> = {
   rat: RAT,
   "grey rat": derive("grey rat", (p) => { p.look.coat = "grey"; }),
@@ -44,6 +52,7 @@ export const PRESETS: Record<string, CreatureParams> = {
   "black rat": derive("black rat", (p) => { p.look.coat = "black"; p.shape.tailLength = 1.2; p.shape.girth = 0.9; p.shape.ears = 1.2; }),
   "fat rat": derive("fat rat", (p) => { p.shape.girth = 1.3; p.shape.size = 1.15; p.gait.pace = 1.1; p.gait.bounce = 1.3; }),
 };
+/** The keys of {@link PRESETS}, in declaration order. */
 export const PRESET_NAMES = Object.keys(PRESETS);
 
 /**
@@ -60,6 +69,15 @@ const VOXELS_PER_SIZE = 62.5;
  * vox/m comes out at size 0.8, about 50 voxels long). Presets keep their
  * ratios to each other; sizes snap to the 0.05 grid of `shape.size` and never
  * go below 0.7, where legs would thin to one voxel.
+ *
+ * @param params - Any creature params; not mutated.
+ * @param voxelsPerMetre - The world's scale.
+ * @returns A copy with only `shape.size` changed.
+ * @example
+ * ```ts
+ * const rat = atScale(PRESETS.rat, 100); // size 0.8
+ * const { entity } = generateCreature(rat, seededRandom(1));
+ * ```
  */
 export function atScale(params: CreatureParams, voxelsPerMetre: number): CreatureParams {
   const p: CreatureParams = JSON.parse(JSON.stringify(params));

@@ -4,6 +4,10 @@
 
 import type { RGB, Role } from "@voxolith/engine";
 
+/**
+ * Voxel value of every colour role a rock writes. Fixed and ordered: role `r` is described by
+ * `buildRoles(colors)[r - 1]`.
+ */
 export const ROLE = {
   ROCK_LIGHT: 1,
   ROCK_MID: 2,
@@ -24,8 +28,13 @@ export const ROLE_COUNT = 10;
 const ID = ["rock.light", "rock.mid", "rock.dark", "strata", "crack", "moss", "moss.dark", "lichen", "wet", "snow"];
 const NAME = ["Rock light", "Rock mid", "Rock dark", "Strata", "Crack", "Moss", "Moss dark", "Lichen", "Wet base", "Snow"];
 
+/** Colour for every role, keyed by voxel value (a {@link ROLE} value). */
 export type ColorSet = Record<number, RGB>;
 
+/**
+ * The rock's role table in voxel-value order, coloured from `colors` (usually {@link skinFor});
+ * a role `colors` leaves out shows magenta.
+ */
 export function buildRoles(colors: ColorSet): Role[] {
   const out: Role[] = [];
   for (let v = 1; v <= ROLE_COUNT; v++) out.push({ id: ID[v - 1], name: NAME[v - 1], color: colors[v] ?? [1, 0, 1] });

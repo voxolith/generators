@@ -1,26 +1,28 @@
-// @voxolith/gen-building — procedural voxel buildings.
-//
-// A small shape grammar followed by detail passes, in this order:
-//
-//   1. mass     plinth, hollow storeys with floor slabs, the roof shell, gables
-//   2. layout   where every window and the door go, decided before any
-//               texture so timber framing can frame them
-//   3. walls    brick bond, ashlar courses, plaster with spalling, or a timber
-//               frame; joints are recessed so masonry has relief
-//   4. trim     quoins, string courses, cornice, water table
-//   5. openings windows with reveals, frames, glazing bars, sills, lintels,
-//               shutters and flower boxes; a panelled or boarded door with a
-//               transom, handle, hood, lamp and steps
-//   6. roof     courses of tile, slate or shingle with staggered joints, or
-//               thatch with ragged eaves and a ligger ridge; ridge cap, barge
-//               boards, rafter tails, gutters and downpipes
-//   7. chimneys brick stacks with a corbelled cap and hollow pots
-//   8. weather  streaks under sills, rising damp, roof and plinth moss
-//
-// Walls are addressed in face-local coordinates: `u` runs along the face, `y`
-// is height, and `d` is depth into the wall from its outer skin (d = 0), with
-// negative d standing proud of it. Everything random comes from the injected
-// rng or from hashes of positions, so the same seed rebuilds the same house.
+/**
+ * @voxolith/gen-building: procedural voxel buildings.
+ *
+ * A small shape grammar followed by detail passes, in this order:
+ *
+ * 1. **mass**: plinth, hollow storeys with floor slabs, the roof shell, gables
+ * 2. **layout**: where every window and the door go, decided before any texture so timber
+ *    framing can frame them
+ * 3. **walls**: brick bond, ashlar courses, plaster with spalling, or a timber frame; joints are
+ *    recessed so masonry has relief
+ * 4. **trim**: quoins, string courses, cornice, water table
+ * 5. **openings**: windows with reveals, frames, glazing bars, sills, lintels, shutters and
+ *    flower boxes; a panelled or boarded door with a transom, handle, hood, lamp and steps
+ * 6. **roof**: courses of tile, slate or shingle with staggered joints, or thatch with ragged
+ *    eaves and a ligger ridge; ridge cap, barge boards, rafter tails, gutters and downpipes
+ * 7. **chimneys**: brick stacks with a corbelled cap and hollow pots
+ * 8. **weather**: streaks under sills, rising damp, roof and plinth moss
+ *
+ * Walls are addressed in face-local coordinates: `u` runs along the face, `y`
+ * is height, and `d` is depth into the wall from its outer skin (d = 0), with
+ * negative d standing proud of it. Everything random comes from the injected
+ * rng or from hashes of positions, so the same seed rebuilds the same house.
+ *
+ * @packageDocumentation
+ */
 
 import { hash01, makeNoise, Volume } from "@voxolith/gen-kit";
 import { refinement, registerGenerator, type Entity, type EntityGenerator, type GenerateContext, type ParamSpec, type Vec3 } from "@voxolith/engine";
@@ -29,16 +31,21 @@ import { buildRoles, ROLE } from "./roles";
 import { cloneParams, type BuildingParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
 
+/** Counts and timing from one {@link generateBuilding} call. Voxel counts are coarse. */
 export interface BuildingStats {
   total: number;
+  /** Windows cut, gable windows included, and how many of them glow. */
   windows: number;
   lit: number;
   doors: number;
   storeys: number;
+  /** Model size in voxels (at a finer scale, the refined size). */
   size: { x: number; y: number; z: number };
+  /** Wall-clock generation time. */
   ms: number;
 }
 
+/** What {@link generateBuilding} returns: the entity and its stats. */
 export interface BuildingResult {
   entity: Entity;
   stats: BuildingStats;
@@ -72,9 +79,30 @@ interface Opening {
 const h2 = (a: number, b: number, c = 0) => hash01((Math.imul(a, 73856093) ^ Math.imul(b, 19349663) ^ Math.imul(c, 83492791)) | 0);
 
 /**
- * Generate a building. A finer `ctx.voxelsPerMetre` builds the same design
- * without its coarse relief and refines it with masonry and joinery at their
- * real size (see fine.ts).
+ * Generate a building: the mass (plinth, hollow storeys, roof shell), the window and door
+ * layout, then wall texture, trim, openings, roof courses, chimneys and weathering. Rooms are
+ * hollow and closed; the front door faces +z. Pure and deterministic in its params and rng.
+ *
+ * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design is built without
+ * its coarse relief and refined on its outside faces only, masonry and joinery redrawn at their
+ * real size.
+ *
+ * @param params - The building; not mutated. Start from a {@link PRESETS} entry.
+ * @param rng - Source of all randomness, returning 0..1 (e.g. `seededRandom(seed)`).
+ * @param id - The entity id.
+ * @param ctx - Optional scale; omitted or 10 voxels per metre gives the coarse model.
+ * @returns The entity (kind `building`, anchored at the centre of its footprint at the foot of
+ * the plinth) and stats.
+ * @example
+ * ```ts
+ * import { seededRandom } from "@voxolith/renderer/core";
+ * import { cloneParams, generateBuilding, PRESETS } from "@voxolith/gen-building";
+ *
+ * const p = cloneParams(PRESETS.cottage);
+ * p.shape.storeys = 2;
+ * p.look.lit = 0.5; // dusk
+ * const { entity, stats } = generateBuilding(p, seededRandom(42));
+ * ```
  */
 export function generateBuilding(params: BuildingParams, rng: () => number, id = "building", ctx?: GenerateContext): BuildingResult {
   const t0 = performance.now();
@@ -853,37 +881,38 @@ export function generateBuilding(params: BuildingParams, rng: () => number, id =
 // --- generator registration ------------------------------------------------
 
 const PARAMS: ParamSpec[] = [
-  { path: "shape.width", label: "Width", kind: "int", min: 24, max: 140, group: "Shape" },
-  { path: "shape.depth", label: "Depth", kind: "int", min: 24, max: 120, group: "Shape" },
-  { path: "shape.storeys", label: "Storeys", kind: "int", min: 1, max: 5, group: "Shape" },
-  { path: "shape.storeyHeight", label: "Storey height", kind: "int", min: 18, max: 32, group: "Shape" },
-  { path: "shape.wallThickness", label: "Wall thickness", kind: "int", min: 2, max: 4, group: "Shape" },
-  { path: "shape.plinth", label: "Plinth", kind: "int", min: 0, max: 8, group: "Shape" },
-  { path: "shape.roof", label: "Roof", kind: "enum", options: ["gable", "hip", "flat"], group: "Roof" },
+  { path: "shape.width", label: "Width", kind: "int", min: 24, max: 140, group: "Shape", help: "length of the front wall in voxels (10 per metre); the ridge runs along the longer side" },
+  { path: "shape.depth", label: "Depth", kind: "int", min: 24, max: 120, group: "Shape", help: "length of the side walls in voxels, front to back" },
+  { path: "shape.storeys", label: "Storeys", kind: "int", min: 1, max: 5, group: "Shape", help: "number of floors below the roof" },
+  { path: "shape.storeyHeight", label: "Storey height", kind: "int", min: 18, max: 32, group: "Shape", help: "floor-to-floor height in voxels, including the slab" },
+  { path: "shape.wallThickness", label: "Wall thickness", kind: "int", min: 2, max: 4, group: "Shape", help: "thickness of the outer walls in voxels" },
+  { path: "shape.plinth", label: "Plinth", kind: "int", min: 0, max: 8, group: "Shape", help: "height of the stone plinth the walls stand on, in voxels; the front door is reached by steps" },
+  { path: "shape.roof", label: "Roof", kind: "enum", options: ["gable", "hip", "flat"], group: "Roof", help: "gable has two slopes and end gables, hip slopes on all four sides, flat is a parapet roof" },
   { path: "shape.roofPitch", label: "Roof pitch", kind: "number", min: 0.5, max: 2.5, step: 0.05, group: "Roof", help: "run per rise: 1 is 45°" },
-  { path: "shape.overhang", label: "Eaves", kind: "int", min: 0, max: 6, group: "Roof" },
-  { path: "shape.chimneys", label: "Chimneys", kind: "int", min: 0, max: 3, group: "Roof" },
-  { path: "openings.windowWidth", label: "Window width", kind: "int", min: 3, max: 13, group: "Openings" },
-  { path: "openings.windowHeight", label: "Window height", kind: "int", min: 4, max: 16, group: "Openings" },
-  { path: "openings.windowSpacing", label: "Window spacing", kind: "int", min: 10, max: 36, group: "Openings" },
-  { path: "openings.windowFraction", label: "Window fill", kind: "number", min: 0, max: 1, step: 0.05, group: "Openings" },
-  { path: "openings.glazingBars", label: "Glazing bars", kind: "bool", group: "Openings" },
-  { path: "openings.shutters", label: "Shutters", kind: "number", min: 0, max: 1, step: 0.05, group: "Openings" },
-  { path: "openings.flowerBoxes", label: "Flower boxes", kind: "number", min: 0, max: 1, step: 0.05, group: "Openings" },
+  { path: "shape.overhang", label: "Eaves", kind: "int", min: 0, max: 6, group: "Roof", help: "how far the eaves stand out past the walls, in voxels; gutters need at least 2" },
+  { path: "shape.chimneys", label: "Chimneys", kind: "int", min: 0, max: 3, group: "Roof", help: "number of brick chimney stacks on the roof" },
+  { path: "openings.windowWidth", label: "Window width", kind: "int", min: 3, max: 13, group: "Openings", help: "window opening width in voxels" },
+  { path: "openings.windowHeight", label: "Window height", kind: "int", min: 4, max: 16, group: "Openings", help: "window opening height in voxels" },
+  { path: "openings.windowSpacing", label: "Window spacing", kind: "int", min: 10, max: 36, group: "Openings", help: "distance between neighbouring windows along a wall, in voxels; higher gives fewer windows" },
+  { path: "openings.windowFraction", label: "Window fill", kind: "number", min: 0, max: 1, step: 0.05, group: "Openings", help: "fraction of window positions actually cut; the rest stay blank wall" },
+  { path: "openings.glazingBars", label: "Glazing bars", kind: "bool", group: "Openings", help: "divide each window into panes" },
+  { path: "openings.shutters", label: "Shutters", kind: "number", min: 0, max: 1, step: 0.05, group: "Openings", help: "fraction of windows with a pair of shutters" },
+  { path: "openings.flowerBoxes", label: "Flower boxes", kind: "number", min: 0, max: 1, step: 0.05, group: "Openings", help: "fraction of windows with a flower box under the sill" },
   { path: "openings.doorWidth", label: "Door width", kind: "int", min: 6, max: 22, group: "Openings", help: "14 and over is a pair of boarded barn doors" },
-  { path: "openings.doorHood", label: "Door hood", kind: "bool", group: "Openings" },
-  { path: "openings.gableWindows", label: "Gable windows", kind: "bool", group: "Openings" },
-  { path: "look.wall", label: "Walls", kind: "enum", options: ["plaster", "brick", "stone", "timber"], group: "Look" },
-  { path: "look.roofStyle", label: "Roofing", kind: "enum", options: ["tile", "slate", "thatch", "shingle"], group: "Look" },
+  { path: "openings.doorHood", label: "Door hood", kind: "bool", group: "Openings", help: "a small hood on brackets over the front door" },
+  { path: "openings.gableWindows", label: "Gable windows", kind: "bool", group: "Openings", help: "windows in the attic gable ends (gable roofs only)" },
+  { path: "look.wall", label: "Walls", kind: "enum", options: ["plaster", "brick", "stone", "timber"], group: "Look", help: "wall material and its texture: plaster, brick, stone or timber framing" },
+  { path: "look.roofStyle", label: "Roofing", kind: "enum", options: ["tile", "slate", "thatch", "shingle"], group: "Look", help: "roof covering: tile, slate, thatch or shingle" },
   { path: "look.relief", label: "Relief", kind: "bool", group: "Look", help: "recessed joints and proud trim" },
-  { path: "look.quoins", label: "Quoins", kind: "bool", group: "Look" },
+  { path: "look.quoins", label: "Quoins", kind: "bool", group: "Look", help: "dressed stone corner quoins and storey bands" },
   { path: "look.spalling", label: "Spalling", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "plaster fallen away to show brick" },
-  { path: "look.gutters", label: "Gutters", kind: "bool", group: "Look" },
-  { path: "look.lit", label: "Lit windows", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
-  { path: "look.weathering", label: "Weathering", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
-  { path: "look.moss", label: "Moss", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
+  { path: "look.gutters", label: "Gutters", kind: "bool", group: "Look", help: "gutters and downpipes along the eaves (needs eaves of 2 or more, not on thatch)" },
+  { path: "look.lit", label: "Lit windows", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "fraction of windows glowing, as at dusk" },
+  { path: "look.weathering", label: "Weathering", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "rain streaks, rising damp and tonal variation on the walls" },
+  { path: "look.moss", label: "Moss", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "moss on the roof, heavier on the shaded slope" },
 ];
 
+/** The `voxolith/house` generator: every building preset, defaults {@link PRESETS}.cottage. */
 export const houseGenerator: EntityGenerator<BuildingParams> = {
   id: "voxolith/house",
   name: "House",
@@ -897,6 +926,10 @@ export const houseGenerator: EntityGenerator<BuildingParams> = {
   scales: [50, 100],
 };
 
+/**
+ * The `voxolith/townhouse` generator: the house generator with {@link PRESETS}.townhouse as its
+ * defaults and brick and slate role colours.
+ */
 export const townhouseGenerator: EntityGenerator<BuildingParams> = {
   ...houseGenerator,
   id: "voxolith/townhouse",
@@ -906,6 +939,7 @@ export const townhouseGenerator: EntityGenerator<BuildingParams> = {
   defaults: PRESETS.townhouse,
 };
 
+/** Register the house and townhouse generators with the engine registry. */
 export function registerBuildingGenerators(): void {
   registerGenerator(houseGenerator);
   registerGenerator(townhouseGenerator);
@@ -915,3 +949,4 @@ export { PRESETS, PRESET_NAMES, skinFor } from "./presets";
 export { ROLE, buildRoles } from "./roles";
 export { cloneParams } from "./params";
 export type { BuildingParams, ShapeParams, OpeningParams, LookParams, RoofKind, WallStyle, RoofStyle } from "./params";
+export type { ColorSet } from "./roles";

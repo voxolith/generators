@@ -3,6 +3,10 @@
 
 import type { RGB, Role } from "@voxolith/engine";
 
+/**
+ * Voxel value of every colour role a creature writes: eleven on the outside, then eight inside
+ * (see {@link INTERIOR}). Fixed and ordered: role `r` is described by `buildRoles(colors)[r - 1]`.
+ */
 export const ROLE = {
   FUR: 1,
   FUR_DARK: 2,
@@ -27,6 +31,7 @@ export const ROLE = {
   BLOOD: 19,
 } as const;
 
+/** Number of roles; voxel values run from 1 to this. */
 export const ROLE_COUNT = 19;
 /** Roles that belong to the inside; they never show on an undamaged animal. */
 export const INTERIOR = new Set<number>([ROLE.FAT, ROLE.FLESH, ROLE.MUSCLE, ROLE.BONE, ROLE.MARROW, ROLE.ORGAN, ROLE.ORGAN_DARK, ROLE.BLOOD]);
@@ -36,8 +41,14 @@ const ID = ["fur", "fur.dark", "fur.light", "belly", "skin", "skin.dark", "claw"
 const NAME = ["Fur", "Fur dark", "Fur light", "Belly", "Skin", "Skin dark", "Claw", "Eye", "Eye shine", "Nose", "Tooth",
   "Fat", "Flesh", "Muscle", "Bone", "Marrow", "Organ", "Organ dark", "Blood"];
 
+/** Colour for every role, keyed by voxel value (a {@link ROLE} value). */
 export type ColorSet = Record<number, RGB>;
 
+/**
+ * The creature's role table in voxel-value order, coloured from `colors` (usually
+ * {@link skinFor}), with glossy material hints on the eyes, organs and blood. A role `colors`
+ * leaves out shows magenta.
+ */
 export function buildRoles(colors: ColorSet): Role[] {
   return ID.map((id, i): Role => {
     const v = i + 1;

@@ -12,6 +12,7 @@ import type { Noise } from "./noise";
 import type { Volume } from "./volume";
 import type { Vec3 } from "@voxolith/engine";
 
+/** Shape and surface of one {@link blob}: extents, boxiness, and two scales of displacement. */
 export interface BlobOptions {
   centre: Vec3;
   /** Half-extents per axis, in voxels. */
@@ -80,6 +81,7 @@ export function blob(vol: Volume, o: BlobOptions, value: number): number {
   return filled;
 }
 
+/** Where {@link facet} cuts: the mass's extents, how many planes, and how deep each one bites. */
 export interface FacetOptions {
   centre: Vec3;
   /** Half-extents of the mass being cut, used to place each plane on its surface. */
@@ -93,6 +95,15 @@ export interface FacetOptions {
   rng: () => number;
 }
 
+/** One cutting plane from {@link facet}: a unit normal and an offset along it. */
+export interface FacetPlane {
+  nx: number;
+  ny: number;
+  nz: number;
+  /** Offset from `centre` along the normal. */
+  d: number;
+}
+
 /**
  * Cleave a solid with random planes, clearing everything beyond each one.
  *
@@ -102,15 +113,13 @@ export interface FacetOptions {
  * like one. Each plane sits on the ellipsoid's surface along its normal (the
  * support function), pulled in by a random fraction, so the cut size scales
  * with the rock and with the direction it faces.
+ *
+ * Every solid voxel in the volume beyond a plane is cleared, not only the mass at `centre`, so
+ * cut each rock in a volume of its own (as gen-rock does) before merging it with others.
+ *
+ * @returns How many voxels were cleared, and the planes, so a later pass can tell a fresh
+ * fracture face from weathered surface.
  */
-export interface FacetPlane {
-  nx: number;
-  ny: number;
-  nz: number;
-  /** Offset from `centre` along the normal. */
-  d: number;
-}
-
 export function facet(vol: Volume, o: FacetOptions): { removed: number; planes: FacetPlane[] } {
   const [cx, cy, cz] = o.centre;
   const [rx, ry, rz] = o.radii;

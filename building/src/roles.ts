@@ -6,6 +6,10 @@
 
 import type { RGB, Role } from "@voxolith/engine";
 
+/**
+ * Voxel value of every colour role a building writes. Fixed and ordered: role `r` is described by
+ * `buildRoles(colors)[r - 1]`.
+ */
 export const ROLE = {
   WALL: 1,
   WALL_DARK: 2,
@@ -61,8 +65,14 @@ const NAME = [
   "Foundation", "Foundation dark", "Floor", "Moss", "Gutter", "Flower", "Flower alt", "Leaf",
 ];
 
+/** Colour for every role, keyed by voxel value (a {@link ROLE} value). */
 export type ColorSet = Record<number, RGB>;
 
+/**
+ * The building's role table in voxel-value order, coloured from `colors` (usually
+ * {@link skinFor}), with material hints on four roles: `GLASS` is glass, `GLASS_LIT` emits, and
+ * `HANDLE` and `GUTTER` are metal. A role `colors` leaves out shows magenta.
+ */
 export function buildRoles(colors: ColorSet): Role[] {
   const out: Role[] = [];
   for (let v = 1; v <= ROLE_COUNT; v++) {

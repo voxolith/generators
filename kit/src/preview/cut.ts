@@ -4,6 +4,15 @@
 
 import type { EntityModel } from "@voxolith/engine";
 
+/**
+ * A copy of a dense model with everything on one side of an axis plane removed, to show its
+ * inside. Voxels exactly at `at` are kept. Sparse models (finer scales) are not supported: they
+ * have no dense `data`.
+ *
+ * @param axis - The axis the cutting plane is perpendicular to.
+ * @param at - Plane position in model voxels.
+ * @param keep - Which side stays: `"below"` keeps coordinates up to `at`.
+ */
 export function cutAway(model: EntityModel, axis: "x" | "y" | "z", at: number, keep: "below" | "above" = "below"): EntityModel {
   const { x: sx, y: sy, z: sz } = model.size;
   const data = model.data.slice();

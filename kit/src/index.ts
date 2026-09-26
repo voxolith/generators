@@ -1,10 +1,14 @@
-// @voxolith/gen-kit — the authoring toolkit generator packages share.
-//
-// A dense working volume, voxel primitives, vector helpers, seeded noise, and
-// the higher-level pieces that more than one generator needs: branching
-// structures, scattered clumps, and the carving and shading that turn a solid
-// mass into something with gaps and depth. Headless and dependency-free, so it
-// runs in a bun script or a worker.
+/**
+ * @voxolith/gen-kit: the authoring toolkit generator packages share.
+ *
+ * A dense working volume, voxel primitives, vector helpers, seeded noise, and
+ * the higher-level pieces that more than one generator needs: branching
+ * structures, scattered clumps, and the carving and shading that turn a solid
+ * mass into something with gaps and depth. Headless and dependency-free, so it
+ * runs in a bun script or a worker.
+ *
+ * @packageDocumentation
+ */
 
 export { Volume } from "./volume";
 export type { Box } from "./volume";

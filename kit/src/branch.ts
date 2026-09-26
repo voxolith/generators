@@ -45,7 +45,13 @@ export interface BranchLevel {
   curl: number;
 }
 
+/**
+ * Everything {@link growBranches} needs: the level-0 seeds, how level 0 tapers and bends, where
+ * children attach, and one {@link BranchLevel} per level of children. Lengths are in voxels of
+ * skeleton space; `unit` rescales every `segLen` so one parameter set works at any size.
+ */
 export interface BranchParams {
+  /** Level-0 stems, each grown from its own seed. */
   seeds: StemSeed[];
   /** Level-0 behaviour: how the trunk itself tapers, curves and is sampled. */
   base: {
@@ -80,6 +86,10 @@ export interface BranchParams {
   maxSegments?: number;
 }
 
+/**
+ * One grown stem: a polyline from its attachment point to its tip, with a radius and an arc
+ * length per point. Children share the exact point object they attached at.
+ */
 export interface Stem {
   id: number;
   level: number;
@@ -93,6 +103,7 @@ export interface Stem {
   seed: number;
 }
 
+/** One piece of a stem between two consecutive polyline points, tapering from `ra` to `rb`. */
 export interface Segment {
   stem: number;
   level: number;
@@ -104,6 +115,7 @@ export interface Segment {
   u: number;
 }
 
+/** The end of a stem on the last level, where foliage, flowers or seed heads attach. */
 export interface Tip {
   p: Vec3;
   dir: Vec3;
@@ -111,6 +123,11 @@ export interface Tip {
   stem: number;
 }
 
+/**
+ * The branch structure {@link growBranches} returns, in skeleton space (seed origins as given,
+ * y up), before any voxel is written. Rasterise it with `capsule` / `line3` per segment, or at a
+ * finer scale with {@link drawSkeletonFine}.
+ */
 export interface Skeleton {
   stems: Stem[];
   segments: Segment[];
@@ -135,6 +152,18 @@ interface Task {
   seed: number;
 }
 
+/**
+ * Grow a branching structure from its seeds, breadth first. Each stem is marched in `segLen`
+ * steps, bent by gravity, phototropism, a whole-trunk sweep and coherent noise wobble; children
+ * spawn on the parent's axis at their attachment points (so the rasterised result stays one
+ * piece), with a pipe-model radius and a length shaped by the `envelope`. Growth stops early at
+ * `maxStems` (20000) or `maxSegments` (60000).
+ *
+ * @param p - Seeds, level-0 behaviour and per-level rules.
+ * @param rng - The generator's injected rng; the only source of randomness.
+ * @param noise - Coherent noise for the wobble, usually `makeNoise` seeded from the same rng.
+ * @returns The skeleton; its height is not exact, so follow with {@link fitHeight}.
+ */
 export function growBranches(p: BranchParams, rng: () => number, noise: Noise): Skeleton {
   const unit = p.unit ?? 1;
   const maxStems = p.maxStems ?? 20000;

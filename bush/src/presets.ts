@@ -66,6 +66,10 @@ const SKINS: Record<string, Skin> = {
   },
 };
 
+/**
+ * Default role colours for a species in a season: stems, thorns, and that season's leaves,
+ * berries, blossom and snow. Unknown species fall back to `bush`.
+ */
 export function skinFor(species: string, season: Season): ColorSet {
   const s = SKINS[species] ?? SKINS.bush;
   const l = s.leaves[season];
@@ -205,6 +209,10 @@ export const HEDGE: BushParams = derive(BUSH, "hedge", (p) => {
   p.look.accentFraction = 0.03;
 });
 
+/**
+ * Tuned shrubs by name: `bush`, `thicket`, `bramble`, `flowering` and `hedge`. Each is a complete
+ * {@link BushParams}; clone before editing (see {@link cloneParams}).
+ */
 export const PRESETS: Record<string, BushParams> = {
   bush: BUSH,
   thicket: THICKET,
@@ -212,4 +220,5 @@ export const PRESETS: Record<string, BushParams> = {
   flowering: FLOWERING,
   hedge: HEDGE,
 };
+/** The keys of {@link PRESETS}, in declaration order. */
 export const PRESET_NAMES = Object.keys(PRESETS);

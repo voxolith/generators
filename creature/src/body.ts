@@ -24,6 +24,11 @@ export interface Body {
   bone: Record<string, number>;
 }
 
+/**
+ * Leg ids: front left, front right, hind left, hind right. Each leg has the bones
+ * `<id>.upper`, `<id>.lower` and `<id>.foot`, and the walk emits a `foot.<id>` event once a
+ * cycle.
+ */
 export const LEGS = ["FL", "FR", "HL", "HR"] as const;
 export type Leg = (typeof LEGS)[number];
 const TAIL_BONES = 7;

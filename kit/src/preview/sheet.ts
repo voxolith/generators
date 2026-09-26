@@ -6,22 +6,45 @@
 import { drawText, textWidth } from "./font";
 import type { RenderResult } from "./render";
 
+/** One tile of a {@link contactSheet}: an image and the caption under it. */
 export interface SheetCell {
   render: RenderResult;
   label?: string;
 }
 
+/** Layout and colours of a {@link contactSheet}. */
 export interface SheetOptions {
+  /** Columns; default the square root of the cell count, rounded up. */
   cols?: number;
   /** Gap between cells and around the edge, in pixels. */
   pad?: number;
+  /** Background colour, 0..255 per channel. */
   background?: [number, number, number];
+  /** Caption and title colour, 0..255 per channel. */
   labelColor?: [number, number, number];
+  /** Pixel size of the built-in bitmap font. Default 2. */
   labelScale?: number;
   /** A heading drawn across the top. */
   title?: string;
 }
 
+/**
+ * Tile renders into one captioned image, left to right then top to bottom, each cell as large as
+ * the largest render. Comparing variants side by side is the main output of a preview run.
+ *
+ * @param cells - At least one; throws on an empty list.
+ * @param opts - Columns, spacing, colours and an optional title.
+ * @returns The sheet as one image.
+ * @example
+ * ```ts
+ * const cells = [1, 2, 3].map((seed) => ({
+ *   render: renderEntity(generateRock(PRESETS.boulder, seededRandom(seed)).entity, { width: 240 }),
+ *   label: `seed ${seed}`,
+ * }));
+ * const sheet = contactSheet(cells, { cols: 3, title: "boulder" });
+ * await Bun.write("rocks.png", encodePng(sheet.width, sheet.height, sheet.rgb));
+ * ```
+ */
 export function contactSheet(cells: SheetCell[], opts: SheetOptions = {}): RenderResult {
   if (cells.length === 0) throw new Error("contactSheet needs at least one cell");
   const cols = Math.max(1, opts.cols ?? Math.ceil(Math.sqrt(cells.length)));

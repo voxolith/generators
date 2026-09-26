@@ -5,6 +5,11 @@
 
 import { deflateSync } from "node:zlib";
 
+/**
+ * Encode 8-bit RGB pixels, row-major, as a PNG file (no alpha, no filtering). Uses node:zlib.
+ *
+ * @returns The file's bytes, ready to write.
+ */
 export function encodePng(width: number, height: number, rgb: Uint8Array): Uint8Array {
   const stride = width * 3;
   const raw = new Uint8Array(height * (1 + stride));

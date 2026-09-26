@@ -11,6 +11,7 @@
 import type { Vec3 } from "@voxolith/engine";
 import type { Volume } from "./volume";
 
+/** How a rasteriser writes: overwrite or empty space only, a callback per voxel, radius scaling. */
 export interface FillOptions {
   /** Called for every voxel written, e.g. to record which segment made it. */
   onFill?: (index: number, x: number, y: number, z: number) => void;
@@ -139,10 +140,15 @@ export function ellipsoid(
   return filled;
 }
 
+/** Solid sphere of radius `r` (voxels) centred on `c`; returns the voxels written. */
 export function sphere(vol: Volume, c: Vec3, r: number, value: number, o: FillOptions = {}): number {
   return ellipsoid(vol, c, [r, r, r], value, undefined, o);
 }
 
+/**
+ * Solid axis-aligned box between the corners `a` and `b`, both inclusive after rounding and
+ * clipped to the volume; returns the voxels written.
+ */
 export function boxFill(vol: Volume, a: Vec3, b: Vec3, value: number, o: FillOptions = {}): number {
   let filled = 0;
   for (let z = Math.max(0, Math.round(a[2])); z <= Math.min(vol.sz - 1, Math.round(b[2])); z++)
@@ -154,17 +160,25 @@ export function boxFill(vol: Volume, a: Vec3, b: Vec3, value: number, o: FillOpt
 
 // --- small vector helpers generators keep needing -------------------------
 
+/** A `Vec3` from three numbers. */
 export const v3 = (x: number, y: number, z: number): Vec3 => [x, y, z];
+/** Component-wise `a + b`. */
 export const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+/** Component-wise `a - b`. */
 export const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+/** `a` multiplied by the scalar `s`. */
 export const scale = (a: Vec3, s: number): Vec3 => [a[0] * s, a[1] * s, a[2] * s];
+/** Dot product. */
 export const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+/** Cross product `a × b` (right-handed). */
 export const cross = (a: Vec3, b: Vec3): Vec3 => [
   a[1] * b[2] - a[2] * b[1],
   a[2] * b[0] - a[0] * b[2],
   a[0] * b[1] - a[1] * b[0],
 ];
+/** Euclidean length. */
 export const length = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
+/** Unit vector along `a`; a zero vector comes back unchanged. */
 export function normalize(a: Vec3): Vec3 {
   const l = Math.hypot(a[0], a[1], a[2]) || 1;
   return [a[0] / l, a[1] / l, a[2] / l];

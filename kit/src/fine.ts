@@ -15,7 +15,9 @@ export interface FineSegment {
   level: number;
 }
 
+/** How {@link drawSkeletonFine} maps, sizes and colours the segments it redraws. */
 export interface FineSkeletonOptions {
+  /** Refinement factor: fine voxels per coarse voxel along each axis. */
   k: number;
   /** Volume-space point to fine model space (crop offset removed, times k). */
   toFine: (p: readonly number[]) => Vec3;
@@ -31,10 +33,20 @@ export interface FineSkeletonOptions {
   thin?: (level: number) => number;
   /** Per-point radius factor for the trunk (level 0), e.g. a root flare, and its maximum. */
   flare?: (x: number, y: number, z: number) => number;
+  /** Largest value `flare` returns, so the scan box is big enough. Default 1. */
   maxFlare?: number;
 }
 
-/** Draw every segment as a thin capsule shell at k times the size. Returns voxels written. */
+/**
+ * Redraw a coarse skeleton's wood at `k` times the size: every segment becomes a capsule shell
+ * (only `shell` voxels thick, since the inside of a limb never shows), thinned per branch level
+ * and optionally flared at the trunk base. This is how tree, bush and grass get round, real-size
+ * limbs at a finer scale instead of the coarse model's blocks scaled up.
+ *
+ * @param w - The fine model being written.
+ * @param segments - The coarse skeleton's segments, in volume space.
+ * @returns The number of voxels written.
+ */
 export function drawSkeletonFine(w: SparseWriter, segments: readonly FineSegment[], opts: FineSkeletonOptions): number {
   const k = opts.k;
   const shell = opts.shell ?? Math.min(4, Math.ceil(k * 0.4));
@@ -55,7 +67,7 @@ export function drawSkeletonFine(w: SparseWriter, segments: readonly FineSegment
  * cubes. Only roles in `accept` count; the nearest accepted neighbour is used
  * when the voxel itself is not one, else `fallback`.
  */
-export function coarseRoleAt(coarse: EntityModel, k: number, noise: Noise, accept: ReadonlySet<number>, fallback: number) {
+export function coarseRoleAt(coarse: EntityModel, k: number, noise: Noise, accept: ReadonlySet<number>, fallback: number): (x: number, y: number, z: number) => number {
   const { x: sx, y: sy, z: sz } = coarse.size;
   const d = coarse.data;
   const at = (x: number, y: number, z: number) => (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz ? 0 : d[x + y * sx + z * sx * sy]);

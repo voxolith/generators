@@ -1,9 +1,13 @@
-// @voxolith/gen-bush — procedural voxel shrubs.
-//
-// Shares the branching, clump placement and canopy shaping in
-// @voxolith/gen-kit with the tree generator; what differs is the base. A
-// bush has no trunk: several stems leave the ground together and lean outward,
-// and a thicket scatters more clumps of them around the centre.
+/**
+ * @voxolith/gen-bush: procedural voxel shrubs.
+ *
+ * Shares the branching, clump placement and canopy shaping in
+ * @voxolith/gen-kit with the tree generator; what differs is the base. A
+ * bush has no trunk: several stems leave the ground together and lean outward,
+ * and a thicket scatters more clumps of them around the centre.
+ *
+ * @packageDocumentation
+ */
 
 import {
   buildHull,
@@ -27,20 +31,30 @@ import { cloneParams, REFERENCE_HEIGHT, type BushParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
 import { bushSeeds, paintStems, voxelizeStems } from "./stems";
 
+/** Counts and timing from one {@link generateBush} call, for tuning. Voxel counts are coarse. */
 export interface BushStats {
+  /** Stem, twig and thorn voxels. */
   wood: number;
+  /** Leaf, blossom and berry voxels. */
   foliage: number;
   total: number;
+  /** Stems in the skeleton, ground stems included. */
   stems: number;
   segments: number;
+  /** Leaf clumps placed. */
   clusters: number;
+  /** Leaves removed by the shell hollow and the sky-hole carve. */
   shellCarved: number;
   macroCarved: number;
+  /** Voxels dropped because they were not connected to the ground. */
   pruned: number;
+  /** Model size in voxels (at a finer scale, the refined size). */
   size: { x: number; y: number; z: number };
+  /** Wall-clock generation time. */
   ms: number;
 }
 
+/** What {@link generateBush} returns: the entity and its stats. */
 export interface BushResult {
   entity: Entity;
   stats: BushStats;
@@ -49,7 +63,30 @@ export interface BushResult {
 // Season changes the palette behind these roles, not the roles themselves.
 const TONES: [number, number, number] = [ROLE.LEAF_HI, ROLE.LEAF_MID, ROLE.LEAF_LO];
 
-/** Generate a bush; a finer `ctx.voxelsPerMetre` refines it (see fine.ts). */
+/**
+ * Generate a bush: several stems leave the ground together and lean outward (plus satellite
+ * clumps for a thicket), branch, carry carved and shaded leaf clumps, thorns, berries or blossom,
+ * then anything not connected to the ground is dropped, so the result is one piece. Pure and
+ * deterministic in its params and rng.
+ *
+ * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design comes back refined:
+ * a sparse model k times the size, stems redrawn from the skeleton.
+ *
+ * @param params - The bush; not mutated. Start from a {@link PRESETS} entry.
+ * @param rng - Source of all randomness, returning 0..1 (e.g. `seededRandom(seed)`).
+ * @param id - The entity id.
+ * @param ctx - Optional scale; omitted or 10 voxels per metre gives the coarse model.
+ * @returns The entity (kind `bush`, anchored at the centre of its base) and stats.
+ * @example
+ * ```ts
+ * import { seededRandom } from "@voxolith/renderer/core";
+ * import { cloneParams, generateBush, PRESETS } from "@voxolith/gen-bush";
+ *
+ * const p = cloneParams(PRESETS.bramble);
+ * p.look.berryFraction = 0.3;
+ * const { entity } = generateBush(p, seededRandom(3));
+ * ```
+ */
 export function generateBush(params: BushParams, rng: () => number, id = "bush", ctx?: GenerateContext): BushResult {
   const t0 = performance.now();
   const p = cloneParams(params);
@@ -248,20 +285,21 @@ function applySnow(vol: Volume, amount: number, noise: { value3: (x: number, y: 
 // --- generator registration ------------------------------------------------
 
 const PARAMS: ParamSpec[] = [
-  { path: "shape.height", label: "Height", kind: "int", min: 12, max: 120, group: "Shape" },
-  { path: "shape.leanDeg", label: "Stem lean", kind: "number", min: 0, max: 50, step: 1, group: "Shape" },
-  { path: "shape.lengthRatio", label: "Stem length", kind: "number", min: 0.4, max: 1.3, step: 0.02, group: "Shape" },
-  { path: "shape.radiusRatio", label: "Stem radius", kind: "number", min: 0.008, max: 0.05, step: 0.001, group: "Shape" },
-  { path: "shape.clumps", label: "Extra clumps", kind: "int", min: 0, max: 8, group: "Shape" },
-  { path: "foliage.clusterRadius", label: "Clump radius", kind: "number", min: 1.5, max: 8, step: 0.1, group: "Foliage" },
-  { path: "foliage.density", label: "Leaf density", kind: "number", min: 0.1, max: 1, step: 0.02, group: "Foliage" },
-  { path: "foliage.macroThreshold", label: "Sky holes", kind: "number", min: 0, max: 0.6, step: 0.01, group: "Foliage" },
-  { path: "look.season", label: "Season", kind: "enum", options: ["spring", "summer", "autumn", "winter"], group: "Look" },
-  { path: "look.health", label: "Health", kind: "number", min: 0, max: 1, step: 0.05, group: "Look" },
-  { path: "look.thorns", label: "Thorns", kind: "number", min: 0, max: 0.5, step: 0.01, group: "Look" },
-  { path: "look.berryFraction", label: "Berries", kind: "number", min: 0, max: 0.5, step: 0.01, group: "Look" },
+  { path: "shape.height", label: "Height", kind: "int", min: 12, max: 120, group: "Shape", help: "overall height in voxels (10 per metre); the whole shrub scales with it" },
+  { path: "shape.leanDeg", label: "Stem lean", kind: "number", min: 0, max: 50, step: 1, group: "Shape", help: "how far the stems lean outward from vertical, in degrees; higher opens the vase wider" },
+  { path: "shape.lengthRatio", label: "Stem length", kind: "number", min: 0.4, max: 1.3, step: 0.02, group: "Shape", help: "stem length as a fraction of height before the shrub is fitted to its height; longer stems give a leggier, more open shrub" },
+  { path: "shape.radiusRatio", label: "Stem radius", kind: "number", min: 0.008, max: 0.05, step: 0.001, group: "Shape", help: "stem base radius as a fraction of height; higher gives thicker, woodier stems" },
+  { path: "shape.clumps", label: "Extra clumps", kind: "int", min: 0, max: 8, group: "Shape", help: "extra, smaller clumps of stems scattered around the centre; 0 is a single shrub" },
+  { path: "foliage.clusterRadius", label: "Clump radius", kind: "number", min: 1.5, max: 8, step: 0.1, group: "Foliage", help: "leaf clump radius in voxels at height 64; larger clumps give a fuller, rounder mass" },
+  { path: "foliage.density", label: "Leaf density", kind: "number", min: 0.1, max: 1, step: 0.02, group: "Foliage", help: "fraction of leaf clumps kept; lower shows more of the twigs" },
+  { path: "foliage.macroThreshold", label: "Sky holes", kind: "number", min: 0, max: 0.6, step: 0.01, group: "Foliage", help: "size of the sky holes carved through the leaves; 0 carves none" },
+  { path: "look.season", label: "Season", kind: "enum", options: ["spring", "summer", "autumn", "winter"], group: "Look", help: "leaf colours and density; in winter every species but the hedge is bare, with snow on its upper faces" },
+  { path: "look.health", label: "Health", kind: "number", min: 0, max: 1, step: 0.05, group: "Look", help: "1 healthy; lower thins the leaves and turns more of them dead brown" },
+  { path: "look.thorns", label: "Thorns", kind: "number", min: 0, max: 0.5, step: 0.01, group: "Look", help: "thorn spikes on a fraction of the stem surface; 0 is a smooth shrub" },
+  { path: "look.berryFraction", label: "Berries", kind: "number", min: 0, max: 0.5, step: 0.01, group: "Look", help: "fraction of leaf clumps whose outer rim carries berries" },
 ];
 
+/** The `voxolith/bush` generator: a single multi-stemmed shrub, defaults {@link PRESETS}.bush. */
 export const bushGenerator: EntityGenerator<BushParams> = {
   id: "voxolith/bush",
   name: "Bush",
@@ -275,6 +313,7 @@ export const bushGenerator: EntityGenerator<BushParams> = {
   scales: [50, 100],
 };
 
+/** The `voxolith/thicket` generator: several clumps, defaults {@link PRESETS}.thicket. */
 export const thicketGenerator: EntityGenerator<BushParams> = {
   ...bushGenerator,
   id: "voxolith/thicket",
@@ -283,6 +322,7 @@ export const thicketGenerator: EntityGenerator<BushParams> = {
   defaults: PRESETS.thicket,
 };
 
+/** Register both generators with the engine registry. */
 export function registerBushGenerators(): void {
   registerGenerator(bushGenerator);
   registerGenerator(thicketGenerator);
@@ -291,4 +331,5 @@ export function registerBushGenerators(): void {
 export { PRESETS, PRESET_NAMES, skinFor } from "./presets";
 export { ROLE, buildRoles } from "./roles";
 export { cloneParams } from "./params";
-export type { BushParams, ShapeParams, FoliageParams, LookParams, Season } from "./params";
+export type { BushParams, ShapeParams, FoliageParams, LookParams, Season, BranchLevel } from "./params";
+export type { ColorSet } from "./roles";

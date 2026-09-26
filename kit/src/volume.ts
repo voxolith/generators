@@ -8,6 +8,7 @@
 
 import type { EntityModel, Role, Vec3 } from "@voxolith/engine";
 
+/** An inclusive, axis-aligned voxel box: both corners are occupied cells. */
 export interface Box {
   x0: number;
   y0: number;
@@ -17,9 +18,28 @@ export interface Box {
   z1: number;
 }
 
+/**
+ * A dense `sx` by `sy` by `sz` grid of 8-bit voxel values, 0 for empty.
+ *
+ * The working surface of every generator: draw into it with the shape rasterisers, run the
+ * surface, flood and shading passes over it, then {@link Volume.crop | crop} it to an
+ * `EntityModel`. Values are role indices, never colours. Reads outside
+ * the grid return 0 and writes outside it are ignored, so passes need no bounds checks.
+ *
+ * @example
+ * ```ts
+ * const WOOD = 1; // role index: roles[WOOD - 1] describes it
+ * const vol = new Volume(32, 48, 32);
+ * capsule(vol, [16, 0, 16], [16, 40, 16], 4, 2, WOOD);
+ * const { reached } = vol.flood6((x, y, z) => y === 0); // reached === vol.count(): one piece
+ * const model = vol.crop([16, 0, 16], [{ id: "wood", name: "Wood", color: [0.4, 0.3, 0.2] }]);
+ * ```
+ */
 export class Volume {
+  /** Voxel values, x fastest, then y, then z: see {@link Volume.index}. */
   readonly data: Uint8Array;
 
+  /** An empty volume `sx` wide (x), `sy` tall (y) and `sz` deep (z). */
   constructor(readonly sx: number, readonly sy: number, readonly sz: number) {
     this.data = new Uint8Array(sx * sy * sz);
   }
@@ -29,19 +49,23 @@ export class Volume {
     return new Volume(Math.ceil(w) + margin * 2, Math.ceil(h) + margin * 2, Math.ceil(d) + margin * 2);
   }
 
+  /** Linear index of a cell in {@link Volume.data}; no bounds check. */
   index(x: number, y: number, z: number): number {
     return x + y * this.sx + z * this.sx * this.sy;
   }
 
+  /** Whether the cell lies within the grid. */
   inside(x: number, y: number, z: number): boolean {
     return x >= 0 && y >= 0 && z >= 0 && x < this.sx && y < this.sy && z < this.sz;
   }
 
+  /** Value at a cell, 0 outside the grid. */
   get(x: number, y: number, z: number): number {
     if (!this.inside(x, y, z)) return 0;
     return this.data[x + y * this.sx + z * this.sx * this.sy];
   }
 
+  /** Write a value; ignored outside the grid. */
   set(x: number, y: number, z: number, v: number): void {
     if (!this.inside(x, y, z)) return;
     this.data[x + y * this.sx + z * this.sx * this.sy] = v;
@@ -56,6 +80,7 @@ export class Volume {
     return true;
   }
 
+  /** Number of solid (non-zero) voxels. */
   count(): number {
     let n = 0;
     for (let i = 0; i < this.data.length; i++) if (this.data[i] !== 0) n++;
@@ -70,6 +95,7 @@ export class Volume {
     return [x, y, z];
   }
 
+  /** Tightest box around every solid voxel, or null when the volume is empty. */
   bounds(): Box | null {
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
     for (let z = 0; z < this.sz; z++)

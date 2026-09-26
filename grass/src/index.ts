@@ -1,12 +1,16 @@
-// @voxolith/gen-grass — procedural voxel ground cover.
-//
-// A patch is many independent blades, not one connected object: tufts are
-// scattered over a disc, each tuft fans a handful of blades out of the ground,
-// and every blade is a single stem one voxel thick that arcs over under its own
-// weight. Unlike a tree, the result is deliberately many pieces — it is ground
-// cover, and each blade only has to reach the ground.
-//
-// Branch growth, rasterisation and noise come from @voxolith/gen-kit.
+/**
+ * @voxolith/gen-grass: procedural voxel ground cover.
+ *
+ * A patch is many independent blades, not one connected object: tufts are
+ * scattered over a disc, each tuft fans a handful of blades out of the ground,
+ * and every blade is a single stem one voxel thick that arcs over under its own
+ * weight. Unlike a tree, the result is deliberately many pieces — it is ground
+ * cover, and each blade only has to reach the ground.
+ *
+ * Branch growth, rasterisation and noise come from @voxolith/gen-kit.
+ *
+ * @packageDocumentation
+ */
 
 import {
   capsule,
@@ -26,17 +30,23 @@ import { buildRoles, ROLE } from "./roles";
 import { cloneParams, REFERENCE_HEIGHT, type GrassParams } from "./params";
 import { PRESETS, skinFor } from "./presets";
 
+/** Counts and timing from one {@link generateGrass} call. Voxel counts are coarse. */
 export interface GrassStats {
   total: number;
   tufts: number;
+  /** Blades grown (a fern's leaflets not counted). */
   blades: number;
   flowers: number;
   seedHeads: number;
+  /** Voxels dropped because they did not reach the ground. */
   pruned: number;
+  /** Model size in voxels (at a finer scale, the refined size). */
   size: { x: number; y: number; z: number };
+  /** Wall-clock generation time. */
   ms: number;
 }
 
+/** What {@link generateGrass} returns: the entity and its stats. */
 export interface GrassResult {
   entity: Entity;
   stats: GrassStats;
@@ -72,7 +82,31 @@ function bladeSeeds(p: GrassParams, rng: () => number): { seeds: StemSeed[]; tuf
   return { seeds, tufts };
 }
 
-/** A finer `ctx.voxelsPerMetre` refines the result (see fine.ts). */
+/**
+ * Generate a patch of ground cover: tufts scattered evenly over a disc, each fanning blades out
+ * of the ground that arc over under their own weight, shaded dark to light from base to tip, with
+ * optional flower or seed heads and snow. Blades are independent pieces; any voxel that does not
+ * reach the ground is dropped. Pure and deterministic in its params and rng.
+ *
+ * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design comes back refined:
+ * a sparse model k times the size, blades redrawn from the skeleton.
+ *
+ * @param params - The patch; not mutated. Start from a {@link PRESETS} entry.
+ * @param rng - Source of all randomness, returning 0..1 (e.g. `seededRandom(seed)`).
+ * @param id - The entity id.
+ * @param ctx - Optional scale; omitted or 10 voxels per metre gives the coarse model.
+ * @returns The entity (kind `groundcover`, anchored at the centre of the patch on the ground) and
+ * stats.
+ * @example
+ * ```ts
+ * import { seededRandom } from "@voxolith/renderer/core";
+ * import { cloneParams, generateGrass, PRESETS } from "@voxolith/gen-grass";
+ *
+ * const p = cloneParams(PRESETS.meadow);
+ * p.shape.footprint = 20;
+ * const { entity } = generateGrass(p, seededRandom(11));
+ * ```
+ */
 export function generateGrass(params: GrassParams, rng: () => number, id = "grass", ctx?: GenerateContext): GrassResult {
   const t0 = performance.now();
   const p = cloneParams(params);
@@ -234,17 +268,18 @@ function applySnow(vol: Volume, amount: number, noise: Noise): void {
 // --- generator registration ------------------------------------------------
 
 const PARAMS: ParamSpec[] = [
-  { path: "shape.height", label: "Blade length", kind: "int", min: 4, max: 80, group: "Shape" },
-  { path: "shape.footprint", label: "Patch radius", kind: "number", min: 2, max: 48, step: 1, group: "Shape" },
-  { path: "shape.fanDeg", label: "Fan", kind: "number", min: 0, max: 60, step: 1, group: "Shape" },
-  { path: "shape.arc", label: "Arc", kind: "number", min: 0, max: 0.12, step: 0.002, group: "Shape" },
-  { path: "shape.radius", label: "Blade thickness", kind: "number", min: 0.3, max: 2, step: 0.05, group: "Shape" },
-  { path: "look.season", label: "Season", kind: "enum", options: ["spring", "summer", "autumn", "winter"], group: "Look" },
-  { path: "look.dry", label: "Dry blades", kind: "number", min: 0, max: 1, step: 0.02, group: "Look" },
-  { path: "look.flowers", label: "Flowers", kind: "number", min: 0, max: 0.6, step: 0.01, group: "Look" },
-  { path: "look.seedHeads", label: "Seed heads", kind: "number", min: 0, max: 1, step: 0.02, group: "Look" },
+  { path: "shape.height", label: "Blade length", kind: "int", min: 4, max: 80, group: "Shape", help: "length of the tallest blade in voxels (10 per metre); shorter blades are a fraction of it" },
+  { path: "shape.footprint", label: "Patch radius", kind: "number", min: 2, max: 48, step: 1, group: "Shape", help: "radius of the disc the tufts are scattered over, in voxels" },
+  { path: "shape.fanDeg", label: "Fan", kind: "number", min: 0, max: 60, step: 1, group: "Shape", help: "how far blades splay from vertical, in degrees; 0 stands them upright" },
+  { path: "shape.arc", label: "Arc", kind: "number", min: 0, max: 0.12, step: 0.002, group: "Shape", help: "downward bend per voxel of blade; 0 is straight, high values arch right over" },
+  { path: "shape.radius", label: "Blade thickness", kind: "number", min: 0.3, max: 2, step: 0.05, group: "Shape", help: "blade radius in voxels; below 1 a blade is a clean one-voxel line" },
+  { path: "look.season", label: "Season", kind: "enum", options: ["spring", "summer", "autumn", "winter"], group: "Look", help: "blade colours; winter also dusts the upper faces with snow" },
+  { path: "look.dry", label: "Dry blades", kind: "number", min: 0, max: 1, step: 0.02, group: "Look", help: "fraction of whole blades that have dried off to straw" },
+  { path: "look.flowers", label: "Flowers", kind: "number", min: 0, max: 0.6, step: 0.01, group: "Look", help: "fraction of blades ending in a flower head, in three colours" },
+  { path: "look.seedHeads", label: "Seed heads", kind: "number", min: 0, max: 1, step: 0.02, group: "Look", help: "fraction of blades ending in a seed head, as on reeds and cereals" },
 ];
 
+/** The `voxolith/grass` generator: a patch of arcing blades, defaults {@link PRESETS}.grass. */
 export const grassGenerator: EntityGenerator<GrassParams> = {
   id: "voxolith/grass",
   name: "Grass patch",
@@ -258,6 +293,7 @@ export const grassGenerator: EntityGenerator<GrassParams> = {
   scales: [50, 100],
 };
 
+/** The `voxolith/meadow` generator: taller grass with flowers, defaults {@link PRESETS}.meadow. */
 export const meadowGenerator: EntityGenerator<GrassParams> = {
   ...grassGenerator,
   id: "voxolith/meadow",
@@ -266,6 +302,7 @@ export const meadowGenerator: EntityGenerator<GrassParams> = {
   defaults: PRESETS.meadow,
 };
 
+/** The `voxolith/fern` generator: arching fronds with leaflets, defaults {@link PRESETS}.fern. */
 export const fernGenerator: EntityGenerator<GrassParams> = {
   ...grassGenerator,
   id: "voxolith/fern",
@@ -274,6 +311,7 @@ export const fernGenerator: EntityGenerator<GrassParams> = {
   defaults: PRESETS.fern,
 };
 
+/** Register the grass, meadow and fern generators with the engine registry. */
 export function registerGrassGenerators(): void {
   registerGenerator(grassGenerator);
   registerGenerator(meadowGenerator);
@@ -283,4 +321,5 @@ export function registerGrassGenerators(): void {
 export { PRESETS, PRESET_NAMES, skinFor } from "./presets";
 export { ROLE, buildRoles } from "./roles";
 export { cloneParams } from "./params";
-export type { GrassParams, ShapeParams, LookParams, Season } from "./params";
+export type { GrassParams, ShapeParams, LookParams, Season, BranchLevel } from "./params";
+export type { ColorSet } from "./roles";

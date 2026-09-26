@@ -10,6 +10,7 @@ import { mix, type Noise } from "./noise";
 import { ellipsoid } from "./shapes";
 import type { Volume } from "./volume";
 
+/** Where one clump goes, usually from {@link spotsAlong} on a twig. */
 export interface ClusterSpot {
   /** Centre of the clump, before the outward push. */
   p: Vec3;
@@ -18,6 +19,7 @@ export interface ClusterSpot {
   radius: number;
 }
 
+/** How {@link placeClusters} shapes and carves each clump. */
 export interface ClusterOptions {
   /** Vertical squash, 1 is spherical. */
   flatten?: number;
@@ -34,10 +36,13 @@ export interface ClusterOptions {
   density?: number;
 }
 
+/** What {@link placeClusters} wrote. */
 export interface ClusterResult {
   /** Which cluster wrote each voxel; 0 means none. */
   clusterId: Uint16Array;
+  /** Clumps placed; ids run from 1 to this. */
   clusters: number;
+  /** Voxels written across all clumps. */
   placed: number;
 }
 

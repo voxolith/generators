@@ -11,9 +11,12 @@ import type { BranchLevel } from "@voxolith/gen-kit";
 
 export type { BranchLevel };
 
+/** The two families the one pipeline grows: a branching crown, or a leader with whorls. */
 export type SpeciesKind = "broadleaf" | "conifer";
+/** Season: leaf colours and density, blossom in spring, bare boughs and snow in winter. */
 export type Season = "spring" | "summer" | "autumn" | "winter";
 
+/** The trunk (level-0 stem): its size, taper, lean and flared foot. */
 export interface TrunkParams {
   /** Trunk length as a fraction of tree height. */
   lengthRatio: number;
@@ -21,9 +24,11 @@ export interface TrunkParams {
   radiusRatio: number;
   /** Taper exponent; 1 is a straight cone, lower keeps mass high up. */
   taperExp: number;
+  /** Most the trunk may lean from vertical, in degrees; the actual lean is random up to this. */
   leanDeg: number;
   /** Total lateral turn over the bole. */
   sweepDeg: number;
+  /** Amplitude of the coherent wobble along the trunk; grows with `look.age`. */
   curl: number;
   /** Root flare height as a fraction of tree height. */
   flareHeightRatio: number;
@@ -33,9 +38,14 @@ export interface TrunkParams {
   flareLobes: number;
   /** Surface roots radiating from the base. */
   roots: number;
+  /** Polyline step along the trunk, in voxels at height 192. */
   segLen: number;
 }
 
+/**
+ * Which wood exists: height, trunk, where the crown starts and ends, and how each level of
+ * branches grows. Together with {@link FoliageParams} this decides the geometry.
+ */
 export interface ShapeParams {
   kind: SpeciesKind;
   /** Overall height in voxels; the skeleton is scaled to hit this exactly. */
@@ -46,6 +56,7 @@ export interface ShapeParams {
   crownEndRatio: number;
   /** "mid" puts the longest limbs mid-crown (broadleaf); "taper" shortens with height (conifer). */
   envelope: "mid" | "taper";
+  /** Random twist added to each child's golden-angle position around its parent, in degrees. */
   azimuthJitterDeg: number;
   /** 0 spawns children alternately; >0 spawns whorls of this many at once. */
   whorl: number;
@@ -55,11 +66,18 @@ export interface ShapeParams {
   pipeExp: number;
   /** Taper exponent for branches (the trunk has its own). */
   branchTaper: number;
+  /** Thinnest any branch gets, in voxels. */
   minRadius: number;
+  /** Growth rules per level of branches; index 0 is the limbs off the trunk. */
   levels: BranchLevel[];
 }
 
+/**
+ * Which leaves exist: broadleaf clumps on the twigs or conifer needle sheaths, and how they are
+ * carved.
+ */
 export interface FoliageParams {
+  /** Grow foliage at all; off leaves the bare wood. */
   enabled: boolean;
   /** Broadleaf cluster radius in voxels at height 192. */
   clusterRadius: number;
@@ -67,7 +85,7 @@ export interface FoliageParams {
   clusterFlatten: number;
   /** Distance between attachment points along a twig, in voxels. */
   spacing: number;
-  /** Extra radius at twig tips. */
+  /** Radius multiplier for the cluster on each twig tip. */
   tipBoost: number;
   /** Noise threshold at the cluster core and rim; higher removes more. */
   fillCore: number;
@@ -87,6 +105,7 @@ export interface FoliageParams {
   whorlGap: number;
 }
 
+/** Which role each voxel gets: season, age and health, bark pattern, moss, snow and blossom. */
 export interface LookParams {
   season: Season;
   /** 0 young and slender, 1 old, fat and gnarled. */
@@ -101,15 +120,24 @@ export interface LookParams {
   plateWarp: number;
   /** Branches thinner than this get flat twig colours instead of bark. */
   minRadiusForPattern: number;
+  /** Moss cover on the lower trunk, 0..1. */
   moss: number;
+  /** Compass direction the mossy side faces, in degrees. */
   mossAzimuthDeg: number;
+  /** Darken crotches and the undersides of limbs with a baked occlusion role. */
   creviceAo: boolean;
   /** Fraction of clusters that take the accent colour. */
   accentFraction: number;
+  /** Winter only: share of sky-facing tops that carry snow, 0..1. */
   snow: number;
+  /** Spring only: fraction of leaf clusters that flower. */
   blossom: number;
 }
 
+/**
+ * Everything a tree is made from. Presets in {@link PRESETS}; the generators expose a subset as
+ * ParamSpecs.
+ */
 export interface TreeParams {
   /** Label only, e.g. "oak". */
   species: string;

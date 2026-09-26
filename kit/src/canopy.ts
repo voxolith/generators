@@ -16,8 +16,13 @@ import type { Volume } from "./volume";
 const THETA_BINS = 36;
 const Y_BINS = 28;
 
+/** Picks the voxel values a pass works on, e.g. `isLeaf` for foliage roles. */
 export type Mask = (value: number) => boolean;
 
+/**
+ * The outer envelope of a mass around a vertical axis at (`cx`, `cz`): the largest radius reached
+ * in each of 36 angle by 28 height bins between `y0` and `y1`. Built by {@link buildHull}.
+ */
 export interface Hull {
   /** Max radius per (angle, height) bin, in voxels from the axis. */
   radius: Float32Array;
@@ -58,6 +63,11 @@ const thetaBin = (dx: number, dz: number): number => {
   return Math.min(THETA_BINS - 1, Math.floor(t * THETA_BINS));
 };
 
+/**
+ * Envelope radius at a voxel's angle and height, blended across neighbouring angle bins so a
+ * shell cut against it has no facets. Compare with the voxel's own distance from the axis for
+ * its depth below the surface.
+ */
 export function hullRadius(hull: Hull, x: number, y: number, z: number): number {
   const dx = x + 0.5 - hull.cx, dz = z + 0.5 - hull.cz;
   const span = Math.max(1, hull.y1 - hull.y0);
@@ -70,6 +80,7 @@ export function hullRadius(hull: Hull, x: number, y: number, z: number): number 
   return (a + b * 2 + c) / 4;
 }
 
+/** How deep {@link carveCanopy} hollows and how much it pockets; distances in voxels. */
 export interface CarveOptions {
   /** Drop voxels deeper than this below the hull. 0 disables. */
   shellDepth: number;
@@ -78,8 +89,11 @@ export interface CarveOptions {
   macroThreshold: number;
 }
 
+/** Voxels {@link carveCanopy} removed, by pass. */
 export interface CarveStats {
+  /** Removed for lying deeper than `shellDepth` below the hull. */
   shell: number;
+  /** Removed by the pocket (sky-hole) carve. */
   macro: number;
 }
 
@@ -133,6 +147,10 @@ export function skyOcclusion(vol: Volume): Uint8Array {
   return out;
 }
 
+/**
+ * Inputs to {@link shadeByExposure}: which voxels to shade, the hull and sky occlusion to score
+ * them against, and the roles to hand out.
+ */
 export interface ShadeOptions {
   isTarget: Mask;
   hull: Hull | null;

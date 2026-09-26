@@ -22,6 +22,7 @@ import { ROLE } from "./roles";
 
 type Vec3 = [number, number, number];
 
+/** Tuning for {@link refineTerrain}. */
 export interface FineTerrainOptions {
   /** Grass blades per grassy column, 0..1 (default 0.22). */
   grass?: number;
@@ -29,18 +30,27 @@ export interface FineTerrainOptions {
   bladeHeight?: number;
   /** Ground kept below the lowest neighbouring surface, in fine voxels (default 6). */
   skin?: number;
+  /** Seeds the blade, pebble and boundary noise. */
   seed?: number;
 }
 
+/**
+ * A terrain `k` times finer, from {@link refineTerrain}: the same queries as {@link Terrain}, in
+ * fine voxels, answered per brick from the coarse heightfield.
+ */
 export interface FineTerrain {
+  /** The terrain it refines; its `heights` stay the source of truth. */
   readonly coarse: Terrain;
+  /** Fine voxels per coarse voxel. */
   readonly k: number;
+  /** Extent in fine columns: the coarse extent times `k`. */
   readonly width: number;
   readonly depth: number;
   /** Top fine voxel of the water, when a column is flooded. */
   readonly waterTop: number;
   /** Ground height (top solid voxel) of a fine column, before blades. */
   heightAt(x: number, z: number): number;
+  /** Is this fine column under water? */
   waterAt(x: number, z: number): boolean;
   /** Highest Y anything is written at, blades included. */
   maxY(): number;
@@ -54,6 +64,7 @@ export interface FineTerrain {
    * fine voxels, with no blades.
    */
   fillBrick(cells: Uint8Array, ox: number, oy: number, oz: number, base: number, top?: (cx: number, cz: number) => number): boolean;
+  /** First point where a ray meets the ground (or, with `water`, the water), as Terrain.pick. */
   pick(origin: Vec3, dir: Vec3, opts?: { water?: boolean; maxT?: number }): Vec3 | null;
 }
 
@@ -67,6 +78,19 @@ function h2(x: number, z: number, s: number): number {
   return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
 }
 
+/**
+ * The same terrain `k` times finer, for a world at 50 or 100 voxels per metre. Nothing is built
+ * up front: the result wraps `coarse` and fills any brick on demand, with a bicubic surface
+ * through the coarse column tops, organic boundaries between surface roles, grass blades on grassy
+ * ground and pebbles on beds and paths. Only a skin of ground is written, so cost follows the
+ * surface. Edits to `coarse.heights` (levelled pads) carry through.
+ *
+ * @param coarse - The terrain at 10 voxels per metre.
+ * @param k - Fine voxels per coarse voxel (5 or 10).
+ * @param opts - Blade density and height, skin depth and seed.
+ * @returns The fine terrain; stream it brick by brick, editing a box per brick column
+ * (`columnSpan`).
+ */
 export function refineTerrain(coarse: Terrain, k: number, opts: FineTerrainOptions = {}): FineTerrain {
   const K = Math.max(1, Math.round(k));
   const W = coarse.width * K, D = coarse.depth * K;

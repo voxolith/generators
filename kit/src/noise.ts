@@ -14,17 +14,27 @@ function hash3(ix: number, iy: number, iz: number, seed: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
+/** Seeded coherent noise from {@link makeNoise}; every function is pure in its inputs. */
 export interface Noise {
   /** Trilinear value noise, 0..1. */
   value3(x: number, y: number, z: number, seed?: number): number;
+  /** 2D value noise, 0..1: a slice of {@link Noise.value3}. */
   value2(x: number, y: number, seed?: number): number;
   /** Fractal sum, 0..1. Octaves double in frequency and halve in amplitude. */
   fbm3(x: number, y: number, z: number, octaves?: number): number;
+  /** 2D fractal sum, 0..1. */
   fbm2(x: number, y: number, octaves?: number): number;
   /** Signed variant in -1..1, handy for direction wobble. */
   signed3(x: number, y: number, z: number, seed?: number): number;
 }
 
+/**
+ * Value noise for one seed. Lattice spacing is 1, so scale coordinates by the feature frequency
+ * (0.1 gives features about ten voxels across). The optional `seed` argument of each function
+ * picks an independent field from the same generator, so two passes can decorrelate.
+ *
+ * @param seed - Any integer; 0 is treated as 1. Derive it from the generator's rng.
+ */
 export function makeNoise(seed = 1): Noise {
   const base = seed >>> 0 || 1;
 
@@ -80,5 +90,7 @@ export function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/** `v` limited to `lo..hi`. */
 export const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
+/** Linear interpolation: `a` at `t = 0`, `b` at `t = 1`, unclamped. */
 export const mix = lerp;

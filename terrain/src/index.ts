@@ -1,23 +1,29 @@
-// @voxolith/gen-terrain — procedural voxel terrain.
-//
-// Rolling hills from layered noise, a river that meanders along a noise
-// contour and carves its own valley, lakes wherever the ground dips below the
-// water level, and a surface chosen per column: grass (drier up high), rock on
-// steep slopes, sand on the banks, gravel and mud on the beds. Water fills
-// every column below the water level with a "water" material the renderer
-// animates.
-//
-// Unlike the entity generators this describes a region, not a model, so it
-// hands back a heightfield rather than an EntityModel: `heights` is sampled
-// once (it is also yours to edit — a settlement levels pads into it) and
-// `fillBrick` writes any 8³ brick on demand, which is what a chunked world
-// wants. Everything is a pure function of (params, seed, position).
+/**
+ * @voxolith/gen-terrain: procedural voxel terrain.
+ *
+ * Rolling hills from layered noise, a river that meanders along a noise
+ * contour and carves its own valley, lakes wherever the ground dips below the
+ * water level, and a surface chosen per column: grass (drier up high), rock on
+ * steep slopes, sand on the banks, gravel and mud on the beds. Water fills
+ * every column below the water level with a "water" material the renderer
+ * animates.
+ *
+ * Unlike the entity generators this describes a region, not a model, so it
+ * hands back a heightfield rather than an EntityModel: `heights` is sampled
+ * once (it is also yours to edit — a settlement levels pads into it) and
+ * `fillBrick` writes any 8³ brick on demand, which is what a chunked world
+ * wants. Everything is a pure function of (params, seed, position).
+ *
+ * @packageDocumentation
+ */
 
 import { makeNoise } from "@voxolith/gen-kit";
 import type { Role } from "@voxolith/engine";
 import { buildRoles, ROLE, SUMMER, type ColorSet } from "./roles";
 
+/** The river: a channel along a slow noise contour, carving its own valley. Lengths in voxels. */
 export interface RiverParams {
+  /** Carve a river at all. */
   enabled: boolean;
   /** Channel width in voxels. */
   width: number;
@@ -36,8 +42,14 @@ export interface RiverParams {
   widthScale?: number;
 }
 
+/**
+ * Everything a terrain is made from. Lengths and heights are in voxels (10 per metre); every
+ * field has a default in {@link DEFAULT_TERRAIN}.
+ */
 export interface TerrainParams {
+  /** Extent along x, in columns. */
   width: number;
+  /** Extent along z, in columns. */
   depth: number;
   /** Grid height; the ground stays well below it so trees fit. */
   height: number;
@@ -51,6 +63,7 @@ export interface TerrainParams {
   detail: number;
   /** Absolute Y of the water surface; columns below it are flooded. */
   waterLevel: number;
+  /** The river; merged field by field over the default. */
   river: RiverParams;
   /** Height step to a neighbour at which ground turns to rock. */
   rockSlope: number;
@@ -58,9 +71,11 @@ export interface TerrainParams {
   sandBand: number;
   /** Ground this far above baseY turns to dry grass. */
   dryAbove: number;
+  /** Role colours; default {@link SUMMER}. */
   colors?: ColorSet;
 }
 
+/** The default region: 320 by 320 columns (32 m) of low hills around a meandering river. */
 export const DEFAULT_TERRAIN: TerrainParams = {
   width: 320,
   depth: 320,
@@ -78,15 +93,23 @@ export const DEFAULT_TERRAIN: TerrainParams = {
 
 type Vec3 = [number, number, number];
 
+/**
+ * A generated region, from {@link generateTerrain}. Everything reads the editable `heights` map,
+ * so levelling a pad into it changes the surface, the roles, `fillBrick` and `pick` together.
+ * Coordinates are voxels; columns outside the map clamp to its edge.
+ */
 export interface Terrain {
+  /** The params it was made from, defaults filled in. */
   readonly params: TerrainParams;
   readonly width: number;
   readonly depth: number;
+  /** Water surface Y, rounded; columns whose ground is below it are flooded. */
   readonly waterLevel: number;
   /** Ground height per column, x + z * width. Editable (levelling), then read by everything below. */
   readonly heights: Int16Array;
   /** Colour roles; role 10 (WATER) carries the "water" material hint. */
   readonly roles: Role[];
+  /** Ground height (top solid voxel) of the nearest column. */
   heightAt(x: number, z: number): number;
   /** Is this column under water? */
   waterAt(x: number, z: number): boolean;
@@ -120,7 +143,12 @@ const smooth = (x: number) => {
 
 /**
  * The height function on its own: pure in (x, z), for a world that streams
- * columns without ever sampling the whole map.
+ * columns without ever sampling the whole map. Gives exactly the values
+ * {@link generateTerrain} samples into `heights`, before any editing.
+ *
+ * @param params - Complete params (fill defaults from {@link DEFAULT_TERRAIN}).
+ * @param seed - The same seed as the terrain it should match.
+ * @returns Ground height (top solid voxel) of a column, rounded.
  */
 export function terrainHeight(params: TerrainParams, seed: number): (x: number, z: number) => number {
   const p = params;
@@ -168,6 +196,29 @@ export function terrainHeight(params: TerrainParams, seed: number): (x: number, 
   };
 }
 
+/**
+ * Generate a region of ground and water: layered-noise hills, a meandering river carving its
+ * valley, lakes wherever the ground dips below the water level, and a surface role per column by
+ * slope, height and nearness to water (grass, dry grass, rock, sand, gravel, mud). The height
+ * map is sampled once into `heights`; everything else is answered on demand, so a chunked world
+ * fills bricks as it streams them. Pure in (params, seed, position).
+ *
+ * @param params - Overrides of {@link DEFAULT_TERRAIN}; `river` merges field by field.
+ * @param seed - Seeds the height and tone noise; the same seed gives the same region.
+ * @returns The region: heights, roles, per-column queries, `fillBrick` and `pick`.
+ * @example
+ * ```ts
+ * import { generateTerrain } from "@voxolith/gen-terrain";
+ *
+ * const terrain = generateTerrain({ width: 256, depth: 256, relief: 14 }, 42);
+ * const { base } = palette.allocate(terrain.roles, "terrain"); // the world's PaletteAllocator
+ * const cells = new Uint8Array(512);
+ * if (terrain.fillBrick(cells, 0, 8, 0, base)) {
+ *   // write `cells` as the 8^3 brick at (0, 8, 0)
+ * }
+ * const hit = terrain.pick(eye, dir, { water: true });
+ * ```
+ */
 export function generateTerrain(params: Partial<TerrainParams> = {}, seed = 1): Terrain {
   const p: TerrainParams = { ...DEFAULT_TERRAIN, ...params, river: { ...DEFAULT_TERRAIN.river, ...params.river } };
   const W = Math.max(8, Math.round(p.width));

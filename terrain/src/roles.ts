@@ -4,6 +4,10 @@
 
 import type { RGB, Role } from "@voxolith/engine";
 
+/**
+ * Voxel value of every colour role the terrain writes. Fixed and ordered: role `r` is described by
+ * `buildRoles(colors)[r - 1]` and maps to palette slot `base + r - 1`.
+ */
 export const ROLE = {
   GRASS: 1,
   GRASS_LIGHT: 2,
@@ -20,10 +24,15 @@ export const ROLE = {
   WATER: 10,
 } as const;
 
+/**
+ * Number of roles; voxel values run from 1 to this, so a host allocates this many palette slots.
+ */
 export const ROLE_COUNT = 10;
 
+/** Colour for every role, keyed by voxel value (a {@link ROLE} value). */
 export type ColorSet = Record<number, RGB>;
 
+/** The default colours: summer grass, soil, rock, sand, beds and water. */
 export const SUMMER: ColorSet = {
   [ROLE.GRASS]: [0.29, 0.42, 0.21],
   [ROLE.GRASS_LIGHT]: [0.35, 0.48, 0.24],
@@ -40,6 +49,10 @@ export const SUMMER: ColorSet = {
 const ID = ["grass", "grass.light", "grass.dry", "soil", "rock", "rock.dark", "sand", "gravel", "mud", "water"];
 const NAME = ["Grass", "Grass light", "Dry grass", "Soil", "Rock", "Rock dark", "Sand", "Gravel", "Mud", "Water"];
 
+/**
+ * The terrain's role table in voxel-value order, coloured from `colors`; `WATER` carries the
+ * `water` material, which the renderer animates. A role `colors` leaves out shows magenta.
+ */
 export function buildRoles(colors: ColorSet = SUMMER): Role[] {
   return ID.map((id, i): Role => {
     const v = i + 1;

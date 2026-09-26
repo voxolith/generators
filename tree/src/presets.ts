@@ -79,6 +79,10 @@ const SKINS: Record<string, Skin> = {
   },
 };
 
+/**
+ * Default role colours for a species in a season: bark, twigs, and that season's leaves,
+ * blossom and snow. Unknown species fall back to oak.
+ */
 export function skinFor(species: string, season: Season): ColorSet {
   const s = SKINS[species] ?? SKINS.oak;
   const l = s.leaves[season];
@@ -270,5 +274,10 @@ export const PINE: TreeParams = derive(SPRUCE, "pine", (p) => {
   p.look.plateWarp = 0.35;
 });
 
+/**
+ * Tuned species by name: broadleaf `oak`, `maple` and `birch`, conifer `spruce` and `pine`. Each is
+ * a complete {@link TreeParams}; clone before editing (see {@link cloneParams}).
+ */
 export const PRESETS: Record<string, TreeParams> = { oak: OAK, maple: MAPLE, birch: BIRCH, spruce: SPRUCE, pine: PINE };
+/** The keys of {@link PRESETS}, in declaration order. */
 export const PRESET_NAMES = Object.keys(PRESETS);

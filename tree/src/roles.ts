@@ -7,6 +7,10 @@
 
 import type { RGB, Role } from "@voxolith/engine";
 
+/**
+ * Voxel value of every colour role a tree writes. Fixed and ordered, since a baked `.vox`
+ * carries them: role `r` is described by `buildRoles(colors)[r - 1]`.
+ */
 export const ROLE = {
   /** Inner wood, only visible where a tree is cut or broken. */
   HEART: 1,
@@ -95,6 +99,10 @@ const NAME = [
 /** Colour for every role, in voxel-value order. */
 export type ColorSet = Record<number, RGB>;
 
+/**
+ * The tree's role table in voxel-value order, coloured from `colors` (usually {@link skinFor});
+ * a role `colors` leaves out shows magenta.
+ */
 export function buildRoles(colors: ColorSet): Role[] {
   const out: Role[] = [];
   for (let v = 1; v <= ROLE_COUNT; v++) {

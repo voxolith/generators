@@ -37,6 +37,7 @@ import type { EntityModel } from "@voxolith/engine";
 import { makeSparse, sparseDims, type SparseVoxels } from "@voxolith/renderer/core";
 import { makeNoise, type Noise } from "./noise";
 
+/** How a role's voxels are refined; see {@link refine} for what each mode draws. */
 export type RefineMode = "smooth" | "crisp" | "leaves" | "blades" | "skip";
 
 /** What a detail function knows about one fine voxel. */
@@ -60,6 +61,7 @@ export interface RefineCell {
   noise: Noise;
 }
 
+/** How {@link refine} treats one role: its mode, mode-specific tuning and a per-voxel `detail`. */
 export interface RoleRule {
   mode: RefineMode;
   /** Final role of a fine voxel, or 0 to carve it. Default: the coarse role. */
@@ -84,6 +86,7 @@ export interface RoleRule {
   blades?: { count?: number; width?: number; lean?: number };
 }
 
+/** Scale, per-role rules and seed for {@link refine}. */
 export interface RefineOptions {
   /** Fine voxels per coarse voxel. */
   k: number;
@@ -103,15 +106,27 @@ export interface RefineOptions {
   faces?: "any" | "outside";
 }
 
+/** What a {@link refine} pass visited and wrote. */
 export interface RefineStats {
+  /** Coarse voxels treated as surface and refined. */
   coarseSurface: number;
+  /** Fine voxels in the result. */
   voxels: number;
+  /** 8^3 bricks allocated in the sparse result. */
   bricks: number;
+  /** Wall-clock time of the pass. */
   ms: number;
 }
 
-/** Writes into a SparseVoxels with the last brick cached (writes come in runs). */
+/**
+ * Reads and writes one sparse voxel set (8^3 bricks, allocated on first non-zero write) with the
+ * last brick cached, since writes come in runs. The fine-scale counterpart of {@link Volume}:
+ * {@link refine} writes through one, and generators pass the same writer to
+ * {@link drawSkeletonFine} or {@link shellCapsule} to add what they redraw themselves.
+ * Out-of-range reads return 0 and writes are ignored.
+ */
 export class SparseWriter {
+  /** The voxels being written; becomes `EntityModel.sparse`. */
   readonly s: SparseVoxels;
   private readonly dx: number;
   private readonly dxy: number;
@@ -120,6 +135,7 @@ export class SparseWriter {
   /** Voxels this writer added (minus those it cleared). */
   voxels = 0;
 
+  /** A writer over a new, empty set of this size, or over an existing set to add to it. */
   constructor(sizeOrExisting: { x: number; y: number; z: number } | SparseVoxels) {
     const size = "bricks" in sizeOrExisting ? sizeOrExisting.size : sizeOrExisting;
     this.s = "bricks" in sizeOrExisting ? sizeOrExisting : makeSparse(size);
@@ -143,6 +159,7 @@ export class SparseWriter {
     return b;
   }
 
+  /** Write a value; 0 clears. */
   set(x: number, y: number, z: number, v: number): void {
     const { x: sx, y: sy, z: sz } = this.s.size;
     if (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) return;
@@ -154,6 +171,7 @@ export class SparseWriter {
     b[i] = v;
   }
 
+  /** Value at a fine voxel, 0 where empty or out of range. */
   get(x: number, y: number, z: number): number {
     const { x: sx, y: sy, z: sz } = this.s.size;
     if (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) return 0;
@@ -179,6 +197,29 @@ const FACES = [
   [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
 ] as const;
 
+/**
+ * Re-voxelise a coarse model `k` times finer, visiting only its surface. Each coarse surface
+ * voxel's fine block is written by its role's {@link RoleRule}: `smooth` rounds steps and fills
+ * concave notches from the interpolated occupancy, `crisp` keeps exact cubes, `leaves` scatters
+ * discs or needles, `blades` draws thin columns, `skip` leaves the role for the generator to
+ * redraw. Only a shell a few fine voxels deep is kept, so cost and memory follow the surface.
+ * Deterministic for a given `seed`.
+ *
+ * @param model - The coarse (dense) model, as the generator made it at 10 voxels per metre.
+ * @param opts - Scale, per-role rules and seed.
+ * @returns A sparse model `k` times the size, same roles, anchor scaled by `k`, and stats.
+ * @example
+ * ```ts
+ * // A rock at 100 voxels per metre from its 10 vox/m model.
+ * const k = 10;
+ * const stone: RoleRule = { mode: "smooth", roughness: 0.18, roughScale: 0.9 * k };
+ * const { model } = refine(coarse, {
+ *   k,
+ *   rules: { [ROLE.ROCK]: stone, [ROLE.SNOW]: { mode: "smooth", roughness: 0.06 } },
+ *   seed: Math.floor(rng() * 0x7fffffff),
+ * });
+ * ```
+ */
 export function refine(model: EntityModel, opts: RefineOptions): { model: EntityModel; stats: RefineStats } {
   const t0 = performance.now();
   const k = Math.max(1, Math.round(opts.k));

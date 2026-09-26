@@ -66,6 +66,10 @@ const SKINS: Record<string, Skin> = {
   },
 };
 
+/**
+ * Default role colours for a species in a season: the blade gradient, dry blades, stalks, seed
+ * heads, three flower colours and snow. Unknown species fall back to `grass`.
+ */
 export function skinFor(species: string, season: Season): ColorSet {
   const s = SKINS[species] ?? SKINS.grass;
   const b = s.blades[season];
@@ -172,5 +176,10 @@ export const DRY: GrassParams = derive(GRASS, "dry", (p) => {
   p.look.seedLength = 3;
 });
 
+/**
+ * Tuned ground cover by name: `grass`, `meadow`, `reeds`, `fern` and `dry`. Each is a complete
+ * {@link GrassParams}; clone before editing (see {@link cloneParams}).
+ */
 export const PRESETS: Record<string, GrassParams> = { grass: GRASS, meadow: MEADOW, reeds: REEDS, fern: FERN, dry: DRY };
+/** The keys of {@link PRESETS}, in declaration order. */
 export const PRESET_NAMES = Object.keys(PRESETS);
