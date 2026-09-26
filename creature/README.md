@@ -49,6 +49,12 @@ const posed = bakePose(entity.model, entity.rig!, poseMatrices(entity.rig!, anim
 - [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every generator is checked against
 - [API reference](https://voxolith.github.io/docs/generators/api/gen-creature/)
 
+Rats can also be posed on the GPU from one shared rest model instead of baked per pose
+(`makeCrowd({ instances, rigged: true })`), after Gruen et al., HPG 2026
+([doi:10.1145/3820014](https://doi.org/10.1145/3820014)) and Kao et al., EG 2026
+([doi:10.2312/egs.20261026](https://doi.org/10.2312/egs.20261026)); see
+[Research and credits](https://voxolith.github.io/docs/credits/).
+
 ## Development
 
 ```sh
