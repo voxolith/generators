@@ -39,7 +39,7 @@ default, never the step: a new step silently changes what old codes decode to.
 
 - `generate(params, rng, ctx?)` is pure. All randomness comes from `rng`, never `Math.random`.
   Voxel values are role indices.
-- Parameters are in **10 voxels per metre**. Finer scales (`scales: [50, 100]`; the creature is
+- Parameters are in **10 voxels per metre**. Finer scales (`scales: [20, 50, 100]`; the creature is
   built at one scale and sized with `atScale`) are built natively at 10 and then refined by
   `gen-kit`'s `refine`, with per-role rules (smooth, crisp, leaves, blades, skip, plus a `detail`
   function). Never generate a fine model natively: whole-volume passes cost 1000× at 10×

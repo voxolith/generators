@@ -48,7 +48,7 @@ export interface RockResult {
  * pass for tones, strata, cracks, moss, lichen, damp and snow. Pure and deterministic in its
  * params and rng.
  *
- * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design comes back refined:
+ * With `ctx.voxelsPerMetre` above the native 10 (20, 50 or 100), the same design comes back refined:
  * a sparse model k times the size with a rounded, grainy surface and hairline cracks.
  *
  * @param params - The rock; not mutated. Start from a {@link PRESETS} entry.
@@ -283,7 +283,7 @@ export const rockGenerator: EntityGenerator<RockParams> = {
   defaults: PRESETS.boulder,
   params: PARAMS,
   generate: (params, rng, ctx) => generateRock(params, rng, undefined, ctx).entity,
-  scales: [50, 100],
+  scales: [20, 50, 100],
 };
 
 /** The `voxolith/outcrop` generator: a main mass with extras, defaults {@link PRESETS}.outcrop. */

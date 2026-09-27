@@ -55,7 +55,7 @@ The long-form material lives on the documentation site, in the
 [generators section](https://voxolith.github.io/docs/generators/), with a page per generator:
 
 - [Using generators](https://voxolith.github.io/docs/generators/using-generators/): direct calls, the registry, presets, workers, variant pools
-- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): how a 10 vox/m design becomes a sparse model at 50 or 100
+- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): how a 10 vox/m design becomes a sparse model at 20, 50 or 100
 - [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every registered generator is checked against
 - [Share codes](https://voxolith.github.io/docs/generators/share-codes/)
 - [The toolkit](https://voxolith.github.io/docs/generators/gen-kit/) and [Writing a generator](https://voxolith.github.io/docs/generators/gen-kit/writing-a-generator/)

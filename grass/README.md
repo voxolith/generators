@@ -41,7 +41,7 @@ const { entity, stats } = generateGrass(PRESETS.meadow, seededRandom(42));
 
 - [Grass](https://voxolith.github.io/docs/generators/grass/): presets, parameters, how it works, finer scales
 - [Using generators](https://voxolith.github.io/docs/generators/using-generators/): direct calls, the registry, workers, variant pools
-- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): the same patch at 50 or 100 voxels per metre
+- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): the same patch at 20, 50 or 100 voxels per metre
 - [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every generator is checked against
 - [API reference](https://voxolith.github.io/docs/generators/api/gen-grass/)
 

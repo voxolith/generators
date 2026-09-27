@@ -26,7 +26,7 @@ type Vec3 = [number, number, number];
 export interface FineTerrainOptions {
   /** Grass blades per grassy column, 0..1 (default 0.22). */
   grass?: number;
-  /** Tallest blade, in fine voxels (default 1.4k). */
+  /** Tallest blade, in fine voxels (default 1.4k, at least 4). */
   bladeHeight?: number;
   /** Ground kept below the lowest neighbouring surface, in fine voxels (default 6). */
   skin?: number;
@@ -79,14 +79,14 @@ function h2(x: number, z: number, s: number): number {
 }
 
 /**
- * The same terrain `k` times finer, for a world at 50 or 100 voxels per metre. Nothing is built
+ * The same terrain `k` times finer, for a world at 20, 50 or 100 voxels per metre. Nothing is built
  * up front: the result wraps `coarse` and fills any brick on demand, with a bicubic surface
  * through the coarse column tops, organic boundaries between surface roles, grass blades on grassy
  * ground and pebbles on beds and paths. Only a skin of ground is written, so cost follows the
  * surface. Edits to `coarse.heights` (levelled pads) carry through.
  *
  * @param coarse - The terrain at 10 voxels per metre.
- * @param k - Fine voxels per coarse voxel (5 or 10).
+ * @param k - Fine voxels per coarse voxel (2, 5 or 10; any integer works).
  * @param opts - Blade density and height, skin depth and seed.
  * @returns The fine terrain; stream it brick by brick, editing a box per brick column
  * (`columnSpan`).
@@ -97,7 +97,9 @@ export function refineTerrain(coarse: Terrain, k: number, opts: FineTerrainOptio
   const CW = coarse.width, CD = coarse.depth;
   const noise = makeNoise(((opts.seed ?? 1) ^ 0x9e37) | 1);
   const grass = opts.grass ?? 0.22;
-  const bladeMax = opts.bladeHeight ?? Math.round(1.4 * K);
+  // At least 4, so blades at a small factor (k = 2, 20 vox/m) still vary in
+  // height (2 or 3 voxels) instead of all stopping at 2.
+  const bladeMax = opts.bladeHeight ?? Math.max(4, Math.round(1.4 * K));
   const skin = opts.skin ?? 6;
   // Coarse water: a column is flooded below S; its top water voxel is S.
   const S = coarse.waterLevel - 1;

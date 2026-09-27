@@ -105,7 +105,7 @@ function branchParamsFor(shape: ShapeParams, rng: () => number): BranchParams {
  * shade it, apply the season, then drop anything not connected to the base, so the result is
  * always one piece. Pure and deterministic: the same params and rng sequence give the same tree.
  *
- * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design comes back refined:
+ * With `ctx.voxelsPerMetre` above the native 10 (20, 50 or 100), the same design comes back refined:
  * a sparse model k times the size, its wood redrawn from the skeleton at real thickness.
  *
  * @param params - The tree; not mutated. Start from a {@link PRESETS} entry.
@@ -289,7 +289,7 @@ function makeTreeGenerator(kind: "broadleaf" | "conifer", defaults: TreeParams):
     defaults,
     params: SHARED_PARAMS,
     generate: (params, rng, ctx) => generateTree(params, rng, undefined, ctx).entity,
-    scales: [50, 100],
+    scales: [20, 50, 100],
   };
 }
 

@@ -56,7 +56,7 @@ export function fineTree(inp: FineTreeInput): { model: EntityModel; stats: { vox
     ra: s.ra, rb: s.rb, level: s.level,
   }));
   let voxels = drawSkeletonFine(w, segments, { k, toFine, value, flare, maxFlare: wood.maxFlare });
-  const shell = Math.min(4, Math.ceil(k * 0.4));
+  const shell = Math.max(2, Math.min(4, Math.ceil(k * 0.4)));
   for (const r of wood.roots) voxels += shellCapsule(w, toFine(r.a), toFine(r.b), r.ra * k, r.rb * k, shell, value);
   return { model, stats: { voxels, bricks: model.sparse!.bricks.size, ms: performance.now() - t0 } };
 }

@@ -69,7 +69,7 @@ const TONES: [number, number, number] = [ROLE.LEAF_HI, ROLE.LEAF_MID, ROLE.LEAF_
  * then anything not connected to the ground is dropped, so the result is one piece. Pure and
  * deterministic in its params and rng.
  *
- * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design comes back refined:
+ * With `ctx.voxelsPerMetre` above the native 10 (20, 50 or 100), the same design comes back refined:
  * a sparse model k times the size, stems redrawn from the skeleton.
  *
  * @param params - The bush; not mutated. Start from a {@link PRESETS} entry.
@@ -310,7 +310,7 @@ export const bushGenerator: EntityGenerator<BushParams> = {
   defaults: PRESETS.bush,
   params: PARAMS,
   generate: (params, rng, ctx) => generateBush(params, rng, undefined, ctx).entity,
-  scales: [50, 100],
+  scales: [20, 50, 100],
 };
 
 /** The `voxolith/thicket` generator: several clumps, defaults {@link PRESETS}.thicket. */

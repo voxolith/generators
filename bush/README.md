@@ -40,7 +40,7 @@ const { entity, stats } = generateBush(PRESETS.thicket, seededRandom(42));
 
 - [Bush](https://voxolith.github.io/docs/generators/bush/): presets, parameters, how it works, finer scales
 - [Using generators](https://voxolith.github.io/docs/generators/using-generators/): direct calls, the registry, workers, variant pools
-- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): the same bush at 50 or 100 voxels per metre
+- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): the same bush at 20, 50 or 100 voxels per metre
 - [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every generator is checked against
 - [API reference](https://voxolith.github.io/docs/generators/api/gen-bush/)
 

@@ -11,7 +11,9 @@
 //     streaky, ragged thatch;
 //   - doors and shutters: boards and slats; floors: planks.
 // The coarse building is generated without its relief (recessed joints),
-// since here the joints are drawn at their own scale.
+// since here the joints are drawn at their own scale. At 20 voxels per metre
+// (5 cm) a brick course or a slate is under two voxels, so there the courses,
+// tiles and boards are drawn at about twice their real size instead.
 
 import { hash4, refine, type RefineCell, type RoleRule } from "@voxolith/gen-kit";
 import type { EntityModel } from "@voxolith/engine";
@@ -26,11 +28,16 @@ function faceUV(c: RefineCell): [number, number, number] {
 
 export function buildingRules(look: LookParams, k: number): Record<number, RoleRule> {
   const s = k / 10; // patterns are drawn for 1 cm voxels and scale with k
+  // Below 50 voxels per metre a pattern at its real size would be finer than
+  // a voxel can show: noise features keep their 50 vox/m size in voxels, and
+  // courses, tiles and boards keep a floor (at 20 vox/m they come out about
+  // twice their real size, which reads; a 1-voxel course would not).
+  const sn = Math.max(s, 0.5);
   const jointBack = (c: RefineCell, joint: boolean, role: number) => (joint ? (c.depth === 0 ? 0 : ROLE.MORTAR) : role);
 
   const brick = (c: RefineCell, base: number): number => {
     const [u, v] = faceUV(c);
-    const H = Math.max(2, Math.round(7 * s)), L = Math.max(4, Math.round(23 * s));
+    const H = Math.max(3, Math.round(7 * s)), L = Math.max(7, Math.round(23 * s));
     const course = Math.floor(v / H);
     const uu = u + (course & 1 ? Math.floor(L / 2) : 0);
     const joint = v % H === H - 1 || uu % L === L - 1;
@@ -57,7 +64,7 @@ export function buildingRules(look: LookParams, k: number): Record<number, RoleR
     return jointBack(c, joint, h < 0.25 ? ROLE.WALL_DARK : h > 0.75 ? ROLE.WALL_LIGHT : ROLE.WALL);
   };
   const plaster = (c: RefineCell): number => {
-    const n = c.noise.value3(c.x / (3 * s), c.y / (3 * s), c.z / (3 * s));
+    const n = c.noise.value3(c.x / (3 * sn), c.y / (3 * sn), c.z / (3 * sn));
     if (c.role !== ROLE.WALL) return c.role;
     return n > 0.8 ? ROLE.WALL_LIGHT : n < 0.18 ? ROLE.WALL_DARK : ROLE.WALL;
   };
@@ -66,19 +73,19 @@ export function buildingRules(look: LookParams, k: number): Record<number, RoleR
 
   const grain = (dark: number) => (c: RefineCell): number => {
     // Grain runs along the member: vertical on posts, horizontal on rails.
-    const n = c.noise.value3(c.x / (2 * s), c.y / (12 * s), c.z / (2 * s));
+    const n = c.noise.value3(c.x / (2 * sn), c.y / (12 * sn), c.z / (2 * sn));
     return n < 0.3 ? dark : c.role;
   };
   const roof = (c: RefineCell): number => {
     const [u, v] = faceUV(c);
     const y = c.y;
     if (look.roofStyle === "thatch") {
-      const n = c.noise.value3(c.x / (1.5 * s), y / (6 * s), c.z / (1.5 * s));
+      const n = c.noise.value3(c.x / (1.5 * sn), y / (6 * sn), c.z / (1.5 * sn));
       if (c.depth === 0 && n > 0.72) return 0;
       return n < 0.3 ? ROLE.ROOF_DARK : n > 0.62 ? ROLE.ROOF_LIGHT : ROLE.ROOF;
     }
-    const rowH = Math.round((look.roofStyle === "slate" ? 7 : look.roofStyle === "shingle" ? 8 : 10) * s);
-    const w = Math.round((look.roofStyle === "slate" ? 16 : look.roofStyle === "shingle" ? 11 : 18) * s);
+    const rowH = Math.max(3, Math.round((look.roofStyle === "slate" ? 7 : look.roofStyle === "shingle" ? 8 : 10) * s));
+    const w = Math.max(4, Math.round((look.roofStyle === "slate" ? 16 : look.roofStyle === "shingle" ? 11 : 18) * s));
     const row = Math.floor(y / rowH);
     const col = Math.floor((u + (row & 1 ? Math.floor(w / 2) : 0)) / w);
     const edge = y % rowH === 0;
@@ -92,7 +99,7 @@ export function buildingRules(look: LookParams, k: number): Record<number, RoleR
   const boards = (dark: number, across: number, horizontal: boolean) => (c: RefineCell): number => {
     const [u, v] = faceUV(c);
     const t = horizontal ? v : u;
-    const seam = t % Math.max(2, Math.round(across * s)) === 0;
+    const seam = t % Math.max(3, Math.round(across * s)) === 0;
     return seam ? (c.depth === 0 ? 0 : dark) : c.role;
   };
   const crisp = (detail?: (c: RefineCell) => number): RoleRule => ({ mode: "crisp", detail });

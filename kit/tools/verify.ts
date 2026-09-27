@@ -1,7 +1,7 @@
 // Headless checks for the toolkit. No GPU.  bun tools/verify.ts
 
 import { seededRandom } from "@voxolith/renderer/core";
-import { blob, capsule, facet, line3, makeNoise, RiggedVolume, Volume } from "../src/index";
+import { blob, capsule, drawSkeletonFine, facet, line3, makeNoise, RiggedVolume, SparseWriter, Volume } from "../src/index";
 import { renderEntity } from "../src/preview/index";
 
 let failures = 0;
@@ -69,6 +69,34 @@ console.log("rigs:");
   const b = r.vol.bounds()!;
   ok(!!model.bones && model.bones.length === model.data.length, "the crop carries the bone binding");
   ok(rig.bones[1].head[0] === 25 - b.x0 && rig.bones[1].parent === 0, "and moves the rig into the same space");
+}
+
+console.log("fine skeleton:");
+{
+  // A thin diagonal twig: at k = 2 a one-voxel, face-connected line; at k = 5
+  // a capsule widened to radius 1 (three voxels across).
+  const seg = [{ a: [1.2, 1.3, 1.1], b: [9.6, 7.7, 5.4], ra: 0.3, rb: 0.3, level: 2 }];
+  const draw = (k: number) => {
+    const w = new SparseWriter({ x: 12 * k, y: 12 * k, z: 12 * k });
+    drawSkeletonFine(w, seg, { k, toFine: (p) => [p[0] * k, p[1] * k, p[2] * k], value: () => 1 });
+    const cells = new Set<string>();
+    for (let z = 0; z < 12 * k; z++) for (let y = 0; y < 12 * k; y++) for (let x = 0; x < 12 * k; x++) if (w.get(x, y, z)) cells.add(`${x},${y},${z}`);
+    const [first] = cells;
+    const seen = new Set([first]);
+    const stack = [first];
+    while (stack.length) {
+      const [x, y, z] = stack.pop()!.split(",").map(Number);
+      for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+        const key = `${x + dx},${y + dy},${z + dz}`;
+        if (cells.has(key) && !seen.has(key)) { seen.add(key); stack.push(key); }
+      }
+    }
+    return { n: cells.size, connected: seen.size === cells.size };
+  };
+  const two = draw(2), five = draw(5);
+  const len2 = Math.abs(19.2 - 2.4) + Math.abs(15.4 - 2.6) + Math.abs(10.8 - 2.2);
+  ok(two.connected && two.n <= len2 + 2, `k = 2: a thin limb is a 6-connected line one voxel thick (${two.n} voxels)`);
+  ok(five.connected && five.n > 3 * 45, `k = 5: it is still a widened capsule (${five.n} voxels)`);
 }
 
 console.log("preview:");

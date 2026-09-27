@@ -88,7 +88,7 @@ function bladeSeeds(p: GrassParams, rng: () => number): { seeds: StemSeed[]; tuf
  * optional flower or seed heads and snow. Blades are independent pieces; any voxel that does not
  * reach the ground is dropped. Pure and deterministic in its params and rng.
  *
- * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design comes back refined:
+ * With `ctx.voxelsPerMetre` above the native 10 (20, 50 or 100), the same design comes back refined:
  * a sparse model k times the size, blades redrawn from the skeleton.
  *
  * @param params - The patch; not mutated. Start from a {@link PRESETS} entry.
@@ -290,7 +290,7 @@ export const grassGenerator: EntityGenerator<GrassParams> = {
   defaults: PRESETS.grass,
   params: PARAMS,
   generate: (params, rng, ctx) => generateGrass(params, rng, undefined, ctx).entity,
-  scales: [50, 100],
+  scales: [20, 50, 100],
 };
 
 /** The `voxolith/meadow` generator: taller grass with flowers, defaults {@link PRESETS}.meadow. */

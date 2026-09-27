@@ -83,7 +83,7 @@ const h2 = (a: number, b: number, c = 0) => hash01((Math.imul(a, 73856093) ^ Mat
  * layout, then wall texture, trim, openings, roof courses, chimneys and weathering. Rooms are
  * hollow and closed; the front door faces +z. Pure and deterministic in its params and rng.
  *
- * With `ctx.voxelsPerMetre` above the native 10 (50 or 100), the same design is built without
+ * With `ctx.voxelsPerMetre` above the native 10 (20, 50 or 100), the same design is built without
  * its coarse relief and refined on its outside faces only, masonry and joinery redrawn at their
  * real size.
  *
@@ -923,7 +923,7 @@ export const houseGenerator: EntityGenerator<BuildingParams> = {
   defaults: PRESETS.cottage,
   params: PARAMS,
   generate: (params, rng, ctx) => generateBuilding(params, rng, undefined, ctx).entity,
-  scales: [50, 100],
+  scales: [20, 50, 100],
 };
 
 /**

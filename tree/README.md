@@ -40,7 +40,7 @@ const { entity, stats } = generateTree(PRESETS.oak, seededRandom(42));
 
 - [Tree](https://voxolith.github.io/docs/generators/tree/): presets, parameters, how it works, finer scales
 - [Using generators](https://voxolith.github.io/docs/generators/using-generators/): direct calls, the registry, workers, variant pools
-- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): the same tree at 50 or 100 voxels per metre
+- [Scales and refinement](https://voxolith.github.io/docs/generators/scales-and-refinement/): the same tree at 20, 50 or 100 voxels per metre
 - [The contract](https://voxolith.github.io/docs/generators/the-contract/): what every generator is checked against
 - [API reference](https://voxolith.github.io/docs/generators/api/gen-tree/)
 

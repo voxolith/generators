@@ -21,7 +21,10 @@ export interface FineSkeletonOptions {
   k: number;
   /** Volume-space point to fine model space (crop offset removed, times k). */
   toFine: (p: readonly number[]) => Vec3;
-  /** Fine voxels of shell to keep under the bark (default min(4, 0.4k)). */
+  /**
+   * Fine voxels of shell to keep under the bark (default min(4, 0.4k), and at least 2: a
+   * one-voxel shell of a round limb leaves diagonal gaps a ray can pass through).
+   */
   shell?: number;
   /** Role of a fine voxel. */
   value: (x: number, y: number, z: number) => number;
@@ -43,20 +46,59 @@ export interface FineSkeletonOptions {
  * and optionally flared at the trunk base. This is how tree, bush and grass get round, real-size
  * limbs at a finer scale instead of the coarse model's blocks scaled up.
  *
+ * A limb thinner than one fine voxel in radius is widened to one, three voxels across. At a
+ * small factor (k < 3, e.g. 20 voxels per metre) that is wider than the coarse voxel it came
+ * from, so there such a limb is drawn as a face-connected line one voxel thick instead.
+ *
  * @param w - The fine model being written.
  * @param segments - The coarse skeleton's segments, in volume space.
  * @returns The number of voxels written.
  */
 export function drawSkeletonFine(w: SparseWriter, segments: readonly FineSegment[], opts: FineSkeletonOptions): number {
   const k = opts.k;
-  const shell = opts.shell ?? Math.min(4, Math.ceil(k * 0.4));
+  const shell = opts.shell ?? Math.max(2, Math.min(4, Math.ceil(k * 0.4)));
   const thin = opts.thin ?? ((l: number) => (l === 0 ? 1 : l === 1 ? 0.75 : 0.5));
   let n = 0;
   for (const s of segments) {
     const f = thin(s.level);
-    const ra = Math.max(1, s.ra * k * f), rb = Math.max(1, s.rb * k * f);
+    const ra0 = s.ra * k * f, rb0 = s.rb * k * f;
+    if (k < 3 && ra0 < 1 && rb0 < 1) {
+      n += lineFine(w, opts.toFine(s.a), opts.toFine(s.b), opts.value);
+      continue;
+    }
+    const ra = Math.max(1, ra0), rb = Math.max(1, rb0);
     const trunk = s.level === 0 && opts.flare;
     n += shellCapsule(w, opts.toFine(s.a), opts.toFine(s.b), ra, rb, shell, opts.value, trunk ? opts.flare : undefined, trunk ? opts.maxFlare ?? 1 : 1);
+  }
+  return n;
+}
+
+/**
+ * A one-voxel line from `a` to `b` into a sparse writer, stepping through every cell the segment
+ * crosses (a face at a time, as gen-kit `line3` does), so it stays 6-connected. `value` picks each
+ * voxel's role; returns the voxels written.
+ */
+function lineFine(w: SparseWriter, a: readonly number[], b: readonly number[], value: (x: number, y: number, z: number) => number): number {
+  let x = Math.floor(a[0]), y = Math.floor(a[1]), z = Math.floor(a[2]);
+  const ex = Math.floor(b[0]), ey = Math.floor(b[1]), ez = Math.floor(b[2]);
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+  const sx = Math.sign(dx), sy = Math.sign(dy), sz = Math.sign(dz);
+  const tdx = sx ? Math.abs(1 / dx) : Infinity, tdy = sy ? Math.abs(1 / dy) : Infinity, tdz = sz ? Math.abs(1 / dz) : Infinity;
+  let tmx = sx ? (sx > 0 ? x + 1 - a[0] : a[0] - x) * tdx : Infinity;
+  let tmy = sy ? (sy > 0 ? y + 1 - a[1] : a[1] - y) * tdy : Infinity;
+  let tmz = sz ? (sz > 0 ? z + 1 - a[2] : a[2] - z) * tdz : Infinity;
+  let n = 0;
+  const put = () => {
+    const v = value(x, y, z);
+    if (v) { w.set(x, y, z, v); n++; }
+  };
+  put();
+  const cap = Math.abs(ex - x) + Math.abs(ey - y) + Math.abs(ez - z) + 3;
+  for (let guard = 0; (x !== ex || y !== ey || z !== ez) && guard < cap; guard++) {
+    if (tmx <= tmy && tmx <= tmz) { x += sx; tmx += tdx; }
+    else if (tmy <= tmz) { y += sy; tmy += tdy; }
+    else { z += sz; tmz += tdz; }
+    put();
   }
   return n;
 }
