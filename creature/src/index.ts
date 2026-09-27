@@ -118,7 +118,7 @@ export function registerCreatureGenerators(): void {
   registerGenerator(creatureGenerator);
 }
 
-export { PRESETS, PRESET_NAMES, skinFor, atScale } from "./presets";
+export { PRESETS, PRESET_NAMES, skinFor, atScale, realSizeAt, minVoxelsPerMetre } from "./presets";
 export { ROLE, ROLE_COUNT, INTERIOR, buildRoles } from "./roles";
 export { LEGS } from "./body";
 export { cloneParams } from "./params";

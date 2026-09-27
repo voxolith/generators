@@ -63,6 +63,15 @@ export const PRESET_NAMES = Object.keys(PRESETS);
  */
 const RAT_LENGTH_M = 0.5;
 const VOXELS_PER_SIZE = 62.5;
+/** Bounds of `shape.size` that {@link atScale} clamps to (below 0.7 legs thin to one voxel). */
+const MIN_SIZE = 0.7;
+const MAX_SIZE = 2;
+
+/** `shape.size` for true size at `voxelsPerMetre`, on the 0.05 grid, before any clamping. */
+function trueSize(params: CreatureParams, voxelsPerMetre: number): number {
+  const factor = (RAT_LENGTH_M * voxelsPerMetre) / (VOXELS_PER_SIZE * RAT.shape.size);
+  return Math.round(params.shape.size * factor * 20) / 20;
+}
 
 /**
  * The same creature, sized for a world of `voxelsPerMetre` (a rat at 100
@@ -81,7 +90,57 @@ const VOXELS_PER_SIZE = 62.5;
  */
 export function atScale(params: CreatureParams, voxelsPerMetre: number): CreatureParams {
   const p: CreatureParams = JSON.parse(JSON.stringify(params));
-  const factor = (RAT_LENGTH_M * voxelsPerMetre) / (VOXELS_PER_SIZE * RAT.shape.size);
-  p.shape.size = Math.max(0.7, Math.min(2, Math.round(params.shape.size * factor * 20) / 20));
+  p.shape.size = Math.max(MIN_SIZE, Math.min(MAX_SIZE, trueSize(params, voxelsPerMetre)));
   return p;
+}
+
+/**
+ * Whether {@link atScale} builds this creature at its real size in a world of
+ * `voxelsPerMetre`. Below {@link minVoxelsPerMetre} it cannot: `atScale` keeps
+ * `shape.size` at 0.7 so the legs stay two voxels thick, and the creature
+ * comes out larger than life (a rat is 0.86 m long at 50 vox/m, 2.15 m at 20).
+ * It is also false above about 250 vox/m, where the size is held at its
+ * upper bound of 2 and the creature comes out smaller than life. Apps that
+ * only show creatures true to size ask this instead of hard-coding a scale.
+ *
+ * @param params - Any creature params, as {@link atScale} takes them; not mutated.
+ * @param voxelsPerMetre - The world's scale.
+ * @returns True when `atScale(params, voxelsPerMetre)` needs no clamping.
+ * @example
+ * ```ts
+ * realSizeAt(PRESETS.rat, 100); // true: size 0.8, 0.5 m nose to tail tip
+ * realSizeAt(PRESETS.rat, 50);  // false: held at size 0.7, 0.86 m long
+ * if (realSizeAt(PRESETS.rat, vpm)) crowd.add(generateCreature(atScale(PRESETS.rat, vpm), rng).entity);
+ * ```
+ */
+export function realSizeAt(params: CreatureParams, voxelsPerMetre: number): boolean {
+  const s = trueSize(params, voxelsPerMetre);
+  return s >= MIN_SIZE && s <= MAX_SIZE;
+}
+
+/**
+ * The smallest world scale, in voxels per metre, at which {@link atScale}
+ * builds this creature at its real size (see {@link realSizeAt}): about 84
+ * for the default rat (size 1.2), 88 for the fat rat (1.15). Scales from here
+ * up to about 250 vox/m are real size. The size snaps to a 0.05 grid, so this
+ * is where the snapped size first reaches 0.7, a little under the unsnapped
+ * 87.5 for the default rat.
+ *
+ * @param params - Any creature params; not mutated.
+ * @returns A scale `v` with `realSizeAt(params, v)` true and false for anything below it.
+ * @example
+ * ```ts
+ * const vpm = 100;
+ * const rats = vpm >= minVoxelsPerMetre(PRESETS.rat); // true: 100 >= 84.375
+ * ```
+ */
+export function minVoxelsPerMetre(params: CreatureParams): number {
+  // trueSize rounds size * vpm * 20 / 150 (for the default proportions): it
+  // reaches MIN_SIZE * 20 once that product is half a step below it.
+  const perVpm = (params.shape.size * RAT_LENGTH_M * 20) / (VOXELS_PER_SIZE * RAT.shape.size);
+  let v = (MIN_SIZE * 20 - 0.5) / perVpm;
+  // Floating point can land a hair either side of the rounding edge.
+  while (trueSize(params, v) < MIN_SIZE) v = v * (1 + 1e-12) + 1e-12;
+  while (trueSize(params, v * (1 - 1e-12)) >= MIN_SIZE && v > 0) v *= 1 - 1e-12;
+  return v;
 }

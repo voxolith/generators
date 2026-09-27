@@ -14,7 +14,10 @@ rest-pose model whose voxels each know their bone, a 26-bone rig and generated c
 [`@voxolith/engine/animation`](https://voxolith.github.io/docs/engine/animation/). Under the fur
 there is fat, flesh, muscle, a skeleton and organs, out of sight until `wound` carves the model or
 `sever` takes a limb off. The presets are stylised game rats; `atScale(params, voxelsPerMetre)`
-sizes one for a world with a fixed unit.
+sizes one for a world with a fixed unit. Below about 84 vox/m a rat cannot be true to size (its
+legs would thin to one voxel), so `atScale` holds it larger than life; `realSizeAt(params,
+voxelsPerMetre)` and `minVoxelsPerMetre(params)` tell an app where that starts, rather than it
+hard-coding the threshold.
 
 ## Install
 

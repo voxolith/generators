@@ -3,7 +3,7 @@
 import { seededRandom } from "@voxolith/renderer/core";
 import type { EntityModel } from "@voxolith/engine";
 import { bakePose, poseMatrices, sampleClip, sever, wound } from "@voxolith/engine/animation";
-import { atScale, generateCreature, INTERIOR, PRESETS, PRESET_NAMES, ROLE, type CreatureParams } from "../src/index";
+import { atScale, generateCreature, minVoxelsPerMetre, realSizeAt, INTERIOR, PRESETS, PRESET_NAMES, ROLE, type CreatureParams } from "../src/index";
 
 let failures = 0;
 const ok = (c: boolean, m: string) => {
@@ -141,6 +141,14 @@ checkRat(PRESETS.rat, `size ${PRESETS.rat.shape.size}`);
 const real = atScale(PRESETS.rat, 100);
 checkRat(real, `size ${real.shape.size}, 100 vox/m`);
 ok(atScale(PRESETS.rat, 10 * 7.5).shape.size < real.shape.size && atScale(PRESETS["fat rat"], 100).shape.size <= real.shape.size, "atScale keeps presets in proportion and shrinks with coarser worlds");
+{
+  const rat = PRESETS.rat, min = minVoxelsPerMetre(rat);
+  ok(realSizeAt(rat, 100) && !realSizeAt(rat, 50) && !realSizeAt(rat, 20), "realSizeAt: the default rat is real size at 100 vox/m, not at 50 or 20");
+  ok(min > 80 && min < 90 && realSizeAt(rat, min) && !realSizeAt(rat, min - 1e-6) && atScale(rat, min).shape.size === 0.7,
+    `minVoxelsPerMetre: the default rat is real size from ${min.toFixed(2)} vox/m, where atScale first reaches size 0.7 unclamped`);
+  ok(PRESET_NAMES.every((n) => { const m = minVoxelsPerMetre(PRESETS[n]); return realSizeAt(PRESETS[n], m) && !realSizeAt(PRESETS[n], m * 0.999); }),
+    "minVoxelsPerMetre agrees with realSizeAt for every preset");
+}
 {
   const { entity } = generateCreature(real, seededRandom(3));
   const len = entity.model.size.z / 100;
