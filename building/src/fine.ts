@@ -9,13 +9,14 @@
 //   - timber frames: grain along the posts and rails;
 //   - roofs: tile, slate or shingle courses with a shadowed lower edge, or
 //     streaky, ragged thatch;
-//   - doors and shutters: boards and slats; floors: planks.
+//   - doors and shutters: boards and slats; floors: planks. Door panels and
+//     handles are joined to the leaf behind the scenes (attachDoorParts).
 // The coarse building is generated without its relief (recessed joints),
 // since here the joints are drawn at their own scale. At 20 voxels per metre
 // (5 cm) a brick course or a slate is under two voxels, so there the courses,
 // tiles and boards are drawn at about twice their real size instead.
 
-import { hash4, refine, type RefineCell, type RoleRule } from "@voxolith/gen-kit";
+import { hash4, refine, SparseWriter, type RefineCell, type RoleRule } from "@voxolith/gen-kit";
 import type { EntityModel } from "@voxolith/engine";
 import { ROLE } from "./roles";
 import type { LookParams } from "./params";
@@ -133,7 +134,98 @@ export function buildingRules(look: LookParams, k: number): Record<number, RoleR
   return rules;
 }
 
+const AXES: [number, number, number][] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+
+/**
+ * Join the door's loose parts to the leaf at the finer scale. The coarse door
+ * is only held together by edges: a recessed panel sits a voxel behind the
+ * stiles and rails that frame it, and a handle stands a voxel proud of the
+ * recess. Refining outside faces alone keeps that gap, so both would float.
+ * Like real joinery, each panel is extended as a tongue into the groove
+ * behind its stiles and rails (hidden from outside by the leaf), and a handle
+ * gets a spindle back to the panel or leaf behind it (for one already touching
+ * the leaf, a single fine voxel into it, since a board seam cut under the
+ * handle would leave it hanging). Only empty fine voxels are written; from
+ * outside, the spindles are all that change. The 10 vox/m door is untouched.
+ */
+function attachDoorParts(coarse: EntityModel, out: SparseWriter, k: number): void {
+  const { x: sx, y: sy, z: sz } = coarse.size;
+  const d = coarse.data;
+  const occ = (x: number, y: number, z: number) =>
+    x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz ? 0 : d[x + y * sx + z * sx * sy];
+  // Air reachable from outside the model's box: a panel's recess is, the
+  // groove behind its stiles (on the room side) is not.
+  const outside = new Uint8Array(sx * sy * sz);
+  {
+    const q: number[] = [];
+    const push = (i: number) => { if (!outside[i] && !d[i]) { outside[i] = 1; q.push(i); } };
+    for (let z = 0; z < sz; z++) for (let y = 0; y < sy; y++) for (let x = 0; x < sx; x++)
+      if (x === 0 || y === 0 || z === 0 || x === sx - 1 || y === sy - 1 || z === sz - 1) push(x + y * sx + z * sx * sy);
+    while (q.length) {
+      const i = q.pop()!;
+      const x = i % sx, y = ((i / sx) | 0) % sy, z = (i / (sx * sy)) | 0;
+      if (x > 0) push(i - 1); if (x < sx - 1) push(i + 1);
+      if (y > 0) push(i - sx); if (y < sy - 1) push(i + sx);
+      if (z > 0) push(i - sx * sy); if (z < sz - 1) push(i + sx * sy);
+    }
+  }
+  const open = (x: number, y: number, z: number) =>
+    x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz || outside[x + y * sx + z * sx * sy] === 1;
+  const w = Math.min(k, 3); // as deep as refine's crisp shell
+  const fill = (bx: number, by: number, bz: number, keep: (l: [number, number, number]) => boolean, v: number) => {
+    const l: [number, number, number] = [0, 0, 0];
+    for (l[2] = 0; l[2] < k; l[2]++)
+      for (l[1] = 0; l[1] < k; l[1]++)
+        for (l[0] = 0; l[0] < k; l[0]++) {
+          if (!keep(l)) continue;
+          const x = bx * k + l[0], y = by * k + l[1], z = bz * k + l[2];
+          if (!out.get(x, y, z)) out.set(x, y, z, v);
+        }
+  };
+  // Fine index i along an axis lies within w of the block's side facing `dir`.
+  const toward = (i: number, dir: number) => (dir > 0 ? i >= k - w : i < w);
+  const axis = (a: [number, number, number]) => (a[0] ? 0 : a[1] ? 1 : 2);
+
+  for (let z = 0; z < sz; z++)
+    for (let y = 0; y < sy; y++)
+      for (let x = 0; x < sx; x++) {
+        const v = d[x + y * sx + z * sx * sy];
+        if (v === ROLE.DOOR_DARK) {
+          // A recessed panel: outside air in front (n), room-side air beside
+          // it (m), the leaf at m + n.
+          for (const n of AXES) {
+            if (!open(x + n[0], y + n[1], z + n[2])) continue;
+            const an = axis(n), sn = n[an];
+            for (const m of AXES) {
+              const am = axis(m), sm = m[am];
+              if (am === an) continue;
+              if (occ(x + m[0], y + m[1], z + m[2]) || open(x + m[0], y + m[1], z + m[2])) continue;
+              if (occ(x + m[0] + n[0], y + m[1] + n[1], z + m[2] + n[2]) !== ROLE.DOOR) continue;
+              fill(x + m[0], y + m[1], z + m[2], (l) => toward(l[am], -sm) && toward(l[an], sn), ROLE.DOOR_DARK);
+            }
+          }
+        } else if (v === ROLE.HANDLE) {
+          // The nearest solid within three voxels, straight out from the handle
+          // (usually the one behind it).
+          let best: [number, number, number] | null = null, dist = 4;
+          for (const e of AXES)
+            for (let j = 1; j < dist; j++)
+              if (occ(x + e[0] * j, y + e[1] * j, z + e[2] * j)) { best = e; dist = j; break; }
+          if (!best) continue;
+          const ae = axis(best), se = best[ae];
+          const sw = Math.max(1, Math.round(0.3 * k)), o = Math.floor((k - sw) / 2);
+          const core = (l: [number, number, number]) => [0, 1, 2].every((a) => a === ae || (l[a] >= o && l[a] < o + sw));
+          for (let j = 1; j < dist; j++) fill(x + best[0] * j, y + best[1] * j, z + best[2] * j, core, ROLE.HANDLE);
+          // One voxel into the solid: the seam refine cuts in a board's
+          // surface can fall right under the handle.
+          fill(x + best[0] * dist, y + best[1] * dist, z + best[2] * dist, (l) => core(l) && (se > 0 ? l[ae] === 0 : l[ae] === k - 1), ROLE.HANDLE);
+        }
+      }
+}
+
 export function fineBuilding(coarse: EntityModel, look: LookParams, k: number, seed: number): EntityModel {
   // Rooms are sealed by walls and glass: only the outside is refined.
-  return refine(coarse, { k, rules: buildingRules(look, k), fallback: { mode: "crisp" }, seed, faces: "outside" }).model;
+  const model = refine(coarse, { k, rules: buildingRules(look, k), fallback: { mode: "crisp" }, seed, faces: "outside" }).model;
+  attachDoorParts(coarse, new SparseWriter(model.sparse!), k);
+  return model;
 }
