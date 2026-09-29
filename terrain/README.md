@@ -14,7 +14,8 @@ level, and a surface chosen per column — grass, rock on steep slopes, sand on 
 mud on the beds. Water fills every flooded column with a `water` material the renderer animates.
 It describes a region rather than a model, so it returns an editable heightfield, per-brick
 filling, per-column queries and `pick`, not an entity; `refineTerrain` gives the same terrain k
-times finer, streamed a brick at a time.
+times finer, streamed a brick at a time. `fineTerrainInit` describes a (levelled) fine terrain as plain
+data and `fineTerrainFrom` rebuilds it, so ground chunks can be filled on workers.
 
 ## Install
 
@@ -52,6 +53,7 @@ ctx.edit({ ...ctx.box, y1: terrain.maxY() }, (cells, ox, oy, oz) => terrain.fill
 bun install
 bun run verify              # shape, river continuity, fillBrick vs roleAt, determinism, picking
 bun run preview             # a shaded map into previews/map.png
+bun run bench [k]           # rebuild-from-data cost and fill time per ground chunk, valley size
 ```
 
 ## License

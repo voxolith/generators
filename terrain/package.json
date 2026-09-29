@@ -15,7 +15,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "verify": "bun tools/verify.ts",
-    "preview": "bun tools/preview.ts"
+    "preview": "bun tools/preview.ts",
+    "bench": "bun tools/bench.ts"
   },
   "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/gen-kit": "workspace:*", "@voxolith/renderer": "workspace:*" },
   "devDependencies": { "@types/node": "^26.6.2", "typescript": "^7.0.2" }

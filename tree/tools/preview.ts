@@ -1,9 +1,10 @@
 // Contact sheets for iterating on the look.
 //
-//   bun tools/preview.ts <round> [--width N] [--seeds N]
+//   bun tools/preview.ts <round> [--width N] [--seeds N] [--vpm N]
 //
 // Rounds follow the order the look is decided in: shape first, then bark, then
-// foliage, then resolution, then the whole species set.
+// foliage, then resolution, then the whole species set. `fine` shows each
+// species at a finer scale (--vpm, default 100), whole and at the trunk base.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { seededRandom } from "@voxolith/renderer/core";
@@ -20,12 +21,13 @@ const flag = (name: string, dflt: number): number => {
 const W = flag("width", 300);
 const H = Math.round(W * 1.35);
 const SEEDS = flag("seeds", 3);
+const VPM = flag("vpm", 100);
 
 const OUT = new URL("../previews/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
 
-function cell(params: TreeParams, seed: number, label: string, opts: RenderOptions = {}): SheetCell {
-  const { entity, stats } = generateTree(params, seededRandom(seed));
+function cell(params: TreeParams, seed: number, label: string, opts: RenderOptions = {}, voxelsPerMetre = 10): SheetCell {
+  const { entity, stats } = generateTree(params, seededRandom(seed), "tree", { voxelsPerMetre });
   const render = renderEntity(entity, { width: W, height: H, yawDeg: 34, pitchDeg: 8, ...opts });
   console.log(
     `  ${label.padEnd(26)} ${String(stats.total).padStart(7)} vox ` +
@@ -135,8 +137,19 @@ switch (round) {
     }
     break;
   }
+  case "fine": {
+    // Judge refinement: the whole tree, then its trunk base from two sides.
+    title = `species at ${VPM} voxels per metre`;
+    cols = 3;
+    for (const name of ["oak", "maple", "birch", "spruce", "pine"]) {
+      cells.push(cell(PRESETS[name], 21, `${name} ${VPM}/m`, {}, VPM));
+      cells.push(cell(PRESETS[name], 21, "base", { yawDeg: 35, pitchDeg: 25, zoom: 0.12, aimY: 0.02 }, VPM));
+      cells.push(cell(PRESETS[name], 21, "base, other side", { yawDeg: 125, pitchDeg: 25, zoom: 0.12, aimY: 0.02 }, VPM));
+    }
+    break;
+  }
   default:
-    console.error(`unknown round "${round}"; try skeleton, bark, foliage, shell, resolution, species, seasons`);
+    console.error(`unknown round "${round}"; try skeleton, bark, foliage, shell, resolution, species, seasons, fine`);
     process.exit(1);
 }
 

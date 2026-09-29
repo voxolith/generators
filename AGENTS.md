@@ -31,6 +31,10 @@ them when a generator's look changes.
 - Nothing floating: models are one connected piece (`looseRoles` may float at finer scales).
 - Share codes round-trip, and every parameter extreme works.
 - A `voxelsPerMetre: 10` context gives the byte-identical model.
+- Every finer scale stays within one native voxel of the native model: each fine voxel, divided
+  by k, lies in or next to (26 neighbours) an occupied native voxel, loose roles included. A
+  level-of-detail chain covers its fine levels with the native occupancy grown by one; a fine
+  voxel outside that cover is not drawn. Checked in `full` and `fine` (about 1.5 s of the run).
 
 A default off its step grid means a share code of the default rebuilds a different model. Fix the
 default, never the step: a new step silently changes what old codes decode to.

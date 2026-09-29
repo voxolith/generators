@@ -47,15 +47,54 @@ export function fineTree(inp: FineTreeInput): { model: EntityModel; stats: { vox
     return bark(cell);
   };
   const toFine = (p: readonly number[]): Vec3 => [(p[0] - cropOffset[0]) * k, (p[1] - cropOffset[1]) * k, (p[2] - cropOffset[2]) * k];
-  // The flare is defined in volume coordinates; map a fine cell back.
-  const flare = (x: number, y: number, z: number) =>
-    wood.flare((x + 0.5) / k + cropOffset[0] - 0.5, (y + 0.5) / k + cropOffset[1] - 0.5, (z + 0.5) / k + cropOffset[2] - 0.5);
   const segments = skel.segments.map((s) => ({
     a: [s.a[0] + origin[0], s.a[1] + origin[1], s.a[2] + origin[2]],
     b: [s.b[0] + origin[0], s.b[1] + origin[1], s.b[2] + origin[2]],
     ra: s.ra, rb: s.rb, level: s.level,
   }));
-  let voxels = drawSkeletonFine(w, segments, { k, toFine, value, flare, maxFlare: wood.maxFlare });
+  // The flare is defined in volume coordinates; map a fine cell back. The
+  // coarse capsule only tests cells inside the segment's box grown by its
+  // unflared radius + 1 (voxelize.ts), so the coarse flare is cut square
+  // there. Left alone, the fine lobes reach up to half a metre past the coarse
+  // model (and past a level-of-detail chain's cover, which is the coarse model
+  // grown by one voxel). So the fine flared radius eases into that same box,
+  // its corners rounded: limiting the radius, rather than cutting the shell,
+  // keeps the base closed. The coarse box stays as it is: widening it would
+  // change every coarse tree, and what its share codes decode to.
+  const flareIn = (s: (typeof segments)[number]) => {
+    const fa = toFine(s.a), fb = toFine(s.b);
+    const dx = fb[0] - fa[0], dy = fb[1] - fa[1], dz = fb[2] - fa[2];
+    const l2 = dx * dx + dy * dy + dz * dz || 1e-9;
+    const pad = Math.ceil(Math.max(s.ra, s.rb)) + 1;
+    // The coarse box's cells, as fine coordinates (lo inclusive, hi exclusive).
+    const lo = [0, 1, 2].map((i) => (Math.floor(Math.min(s.a[i], s.b[i]) - pad) - cropOffset[i]) * k);
+    const hi = [0, 1, 2].map((i) => (Math.ceil(Math.max(s.a[i], s.b[i]) + pad) + 1 - cropOffset[i]) * k);
+    const v = [0, 0, 0];
+    return (x: number, y: number, z: number) => {
+      const f = wood.flare((x + 0.5) / k + cropOffset[0] - 0.5, (y + 0.5) / k + cropOffset[1] - 0.5, (z + 0.5) / k + cropOffset[2] - 0.5);
+      if (f <= 1) return f;
+      const t = Math.max(0, Math.min(1, ((x + 0.5 - fa[0]) * dx + (y + 0.5 - fa[1]) * dy + (z + 0.5 - fa[2]) * dz) / l2));
+      v[0] = x + 0.5 - fa[0] - dx * t; v[1] = y + 0.5 - fa[1] - dy * t; v[2] = z + 0.5 - fa[2] - dz * t;
+      const d = Math.hypot(v[0], v[1], v[2]);
+      const r = Math.max(1, (s.ra + (s.rb - s.ra) * t) * k);
+      if (d < 1e-6) return f;
+      // Distance from the axis to the box along this direction, corners
+      // rounded by a 6-norm (never further than the box itself).
+      let sum = 0;
+      for (let i = 0; i < 3; i++) {
+        const u = v[i] / d, p = i === 0 ? fa[0] + dx * t : i === 1 ? fa[1] + dy * t : fa[2] + dz * t;
+        const room = (u > 0 ? hi[i] - p : p - lo[i]) - 0.5;
+        if (u !== 0) sum += Math.pow(Math.abs(u) / Math.max(room, 1e-3), 6);
+      }
+      const lim = Math.pow(sum, -1 / 6);
+      // Polynomial smooth minimum of the flared radius and the limit (never above either).
+      const soft = 0.2 * lim, fr = f * r, h = Math.max(0, soft - Math.abs(fr - lim)) / soft;
+      return Math.max(1, (Math.min(fr, lim) - (h * h * soft) / 4) / r);
+    };
+  };
+  let voxels = 0;
+  for (const s of segments)
+    voxels += drawSkeletonFine(w, [s], { k, toFine, value, flare: s.level === 0 ? flareIn(s) : undefined, maxFlare: wood.maxFlare });
   const shell = Math.max(2, Math.min(4, Math.ceil(k * 0.4)));
   for (const r of wood.roots) voxels += shellCapsule(w, toFine(r.a), toFine(r.b), r.ra * k, r.rb * k, shell, value);
   return { model, stats: { voxels, bricks: model.sparse!.bricks.size, ms: performance.now() - t0 } };

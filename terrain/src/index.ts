@@ -94,6 +94,39 @@ export const DEFAULT_TERRAIN: TerrainParams = {
 type Vec3 = [number, number, number];
 
 /**
+ * A settlement's surface over the terrain's top voxel (a path, a yard), per column: an absolute
+ * palette slot, or 0 to keep the terrain's own. Either a function of the (coarse) column, or the
+ * same as data: a `Uint8Array` of slots indexed `x + z * width`, which crosses to a worker
+ * (see {@link topOverrideData}).
+ */
+export type TopOverride = ((x: number, z: number) => number) | Uint8Array;
+
+/** Options of {@link generateTerrain}. */
+export interface TerrainBuild {
+  /**
+   * Precomputed ground heights (`width * depth`, `x + z * width`), used as they are instead of
+   * sampling the height function: typically a {@link TerrainInit}'s levelled `heights`, so a worker
+   * rebuilds the same `Terrain` without regenerating it. Adopted, not copied: the terrain's
+   * `heights` is this array.
+   */
+  heights?: Int16Array;
+}
+
+/**
+ * Everything a {@link Terrain} is rebuilt from, as plain data a worker can receive
+ * (`postMessage` structured-clones it; transfer `heights.buffer` to skip the copy). From
+ * {@link terrainInit}; rebuild with `generateTerrain(init.params, init.seed, { heights: init.heights })`.
+ */
+export interface TerrainInit {
+  /** Complete params, defaults filled in (the terrain's `params`). */
+  params: TerrainParams;
+  /** The seed the terrain was made with. */
+  seed: number;
+  /** The ground heights, edits (levelled pads) included. */
+  heights: Int16Array;
+}
+
+/**
  * A generated region, from {@link generateTerrain}. Everything reads the editable `heights` map,
  * so levelling a pad into it changes the surface, the roles, `fillBrick` and `pick` together.
  * Coordinates are voxels; columns outside the map clamp to its edge.
@@ -101,7 +134,11 @@ type Vec3 = [number, number, number];
 export interface Terrain {
   /** The params it was made from, defaults filled in. */
   readonly params: TerrainParams;
+  /** The seed it was made with. */
+  readonly seed: number;
+  /** Extent along x, in columns. */
   readonly width: number;
+  /** Extent along z, in columns. */
   readonly depth: number;
   /** Water surface Y, rounded; columns whose ground is below it are flooded. */
   readonly waterLevel: number;
@@ -124,10 +161,11 @@ export interface Terrain {
   /**
    * Write one 8³ brick at (ox, oy, oz) into `cells` (x + y*8 + z*64), mapping
    * role r to `base + r - 1`. `top` may override the top voxel of a column
-   * with an absolute palette slot (a path, a yard); return 0 to keep it.
+   * with an absolute palette slot (a path, a yard); 0 keeps it. It is a
+   * function or the same as data ({@link TopOverride}).
    * Returns whether anything was written.
    */
-  fillBrick(cells: Uint8Array, ox: number, oy: number, oz: number, base: number, top?: (x: number, z: number) => number): boolean;
+  fillBrick(cells: Uint8Array, ox: number, oy: number, oz: number, base: number, top?: TopOverride): boolean;
   /**
    * First point where a ray meets the ground (or, with `water`, the water
    * surface). `dir` need not be normalised. Null if it never does.
@@ -146,7 +184,7 @@ const smooth = (x: number) => {
  * columns without ever sampling the whole map. Gives exactly the values
  * {@link generateTerrain} samples into `heights`, before any editing.
  *
- * @param params - Complete params (fill defaults from {@link DEFAULT_TERRAIN}).
+ * @param params - Complete params ({@link completeTerrainParams} fills the defaults).
  * @param seed - The same seed as the terrain it should match.
  * @returns Ground height (top solid voxel) of a column, rounded.
  */
@@ -197,6 +235,61 @@ export function terrainHeight(params: TerrainParams, seed: number): (x: number, 
 }
 
 /**
+ * Params with every default filled in, exactly as {@link generateTerrain} merges them: fields
+ * from {@link DEFAULT_TERRAIN} under `params`, and `river` merged field by field. Idempotent, and
+ * always returns a fresh object (the `river` too), so the result can be edited or posted.
+ *
+ * @param params - Overrides of {@link DEFAULT_TERRAIN}.
+ * @returns Complete params: what {@link terrainHeight} takes and what `Terrain.params` holds.
+ */
+export function completeTerrainParams(params: Partial<TerrainParams> = {}): TerrainParams {
+  return { ...DEFAULT_TERRAIN, ...params, river: { ...DEFAULT_TERRAIN.river, ...params.river } };
+}
+
+/**
+ * The map size {@link generateTerrain} builds for complete params: `width` and `depth` rounded,
+ * at least 8 columns each.
+ *
+ * @param params - Overrides of {@link DEFAULT_TERRAIN} (completed first).
+ * @returns Columns along x and rows along z; `heights` has `width * depth` entries.
+ */
+export function terrainSize(params: Partial<TerrainParams> = {}): { width: number; depth: number } {
+  const p = completeTerrainParams(params);
+  return { width: Math.max(8, Math.round(p.width)), depth: Math.max(8, Math.round(p.depth)) };
+}
+
+/**
+ * Sample the rows `z0 <= z < z1` of the height map, the unedited values {@link generateTerrain}
+ * samples into `heights` there. Bands are independent, so workers can each sample one and the
+ * host stitches them (`heights.set(band, z0 * width)`) and passes the result to
+ * `generateTerrain(params, seed, { heights })`: byte for byte the terrain it would sample itself.
+ *
+ * @param params - Overrides of {@link DEFAULT_TERRAIN} (completed with {@link completeTerrainParams}).
+ * @param seed - The terrain's seed.
+ * @param z0 - First row (clamped to the map).
+ * @param z1 - One past the last row (clamped to the map).
+ * @returns `(z1 - z0) * width` heights, `x + (z - z0) * width`; `width` from {@link terrainSize}.
+ * @example
+ * ```ts
+ * const { width, depth } = terrainSize(params);
+ * const heights = new Int16Array(width * depth);
+ * const mid = depth >> 1; // each band could come from its own worker
+ * heights.set(terrainHeightsBand(params, seed, 0, mid), 0);
+ * heights.set(terrainHeightsBand(params, seed, mid, depth), mid * width);
+ * const terrain = generateTerrain(params, seed, { heights });
+ * ```
+ */
+export function terrainHeightsBand(params: Partial<TerrainParams>, seed: number, z0: number, z1: number): Int16Array {
+  const p = completeTerrainParams(params);
+  const { width: W, depth: D } = terrainSize(p);
+  const a = clamp(Math.floor(z0), 0, D), b = clamp(Math.floor(z1), a, D);
+  const heightFn = terrainHeight(p, seed);
+  const heights = new Int16Array(W * (b - a));
+  for (let z = a; z < b; z++) for (let x = 0; x < W; x++) heights[x + (z - a) * W] = heightFn(x, z);
+  return heights;
+}
+
+/**
  * Generate a region of ground and water: layered-noise hills, a meandering river carving its
  * valley, lakes wherever the ground dips below the water level, and a surface role per column by
  * slope, height and nearness to water (grass, dry grass, rock, sand, gravel, mud). The height
@@ -205,6 +298,8 @@ export function terrainHeight(params: TerrainParams, seed: number): (x: number, 
  *
  * @param params - Overrides of {@link DEFAULT_TERRAIN}; `river` merges field by field.
  * @param seed - Seeds the height and tone noise; the same seed gives the same region.
+ * @param build - `heights` to adopt instead of sampling them (rebuilding a terrain on a worker
+ * from a {@link TerrainInit}).
  * @returns The region: heights, roles, per-column queries, `fillBrick` and `pick`.
  * @example
  * ```ts
@@ -219,13 +314,11 @@ export function terrainHeight(params: TerrainParams, seed: number): (x: number, 
  * const hit = terrain.pick(eye, dir, { water: true });
  * ```
  */
-export function generateTerrain(params: Partial<TerrainParams> = {}, seed = 1): Terrain {
-  const p: TerrainParams = { ...DEFAULT_TERRAIN, ...params, river: { ...DEFAULT_TERRAIN.river, ...params.river } };
-  const W = Math.max(8, Math.round(p.width));
-  const D = Math.max(8, Math.round(p.depth));
-  const heightFn = terrainHeight(p, seed);
-  const heights = new Int16Array(W * D);
-  for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) heights[x + z * W] = heightFn(x, z);
+export function generateTerrain(params: Partial<TerrainParams> = {}, seed = 1, build: TerrainBuild = {}): Terrain {
+  const p = completeTerrainParams(params);
+  const { width: W, depth: D } = terrainSize(p);
+  if (build.heights && build.heights.length !== W * D) throw new RangeError(`generateTerrain: heights has ${build.heights.length} columns, the params need ${W} x ${D}`);
+  const heights = build.heights ?? terrainHeightsBand(p, seed, 0, D);
   const tone = makeNoise((seed ^ 0x5bd1e995) || 2);
   const wl = Math.round(p.waterLevel);
   /** Y of the top water voxel; a column is flooded when its ground is below it. */
@@ -274,6 +367,7 @@ export function generateTerrain(params: Partial<TerrainParams> = {}, seed = 1): 
 
   return {
     params: p,
+    seed,
     width: W,
     depth: D,
     waterLevel: wl,
@@ -302,7 +396,7 @@ export function generateTerrain(params: Partial<TerrainParams> = {}, seed = 1): 
           const surface = Math.max(h, S);
           if (oy > surface) continue;
           const t = topRole(x, z);
-          const over = top ? top(x, z) : 0;
+          const over = !top ? 0 : typeof top === "function" ? top(x, z) : top[x + z * W];
           const yEnd = Math.min(surface, oy + 7);
           for (let y = oy; y <= yEnd; y++) {
             let v: number;
@@ -345,7 +439,48 @@ export function generateTerrain(params: Partial<TerrainParams> = {}, seed = 1): 
   };
 }
 
+/**
+ * A terrain as plain data, to rebuild the same {@link Terrain} elsewhere (a worker) without
+ * regenerating it: its complete params, seed and a copy of its current `heights` (so the init can
+ * be transferred while the terrain stays usable).
+ *
+ * @param terrain - The terrain, after any levelling.
+ * @returns Structured-clonable data; `generateTerrain(init.params, init.seed, { heights: init.heights })`
+ * rebuilds it.
+ */
+export function terrainInit(terrain: Terrain): TerrainInit {
+  return { params: structuredClone(terrain.params), seed: terrain.seed, heights: terrain.heights.slice() };
+}
+
+/**
+ * A top override as data: `top` evaluated once on every column of `terrain`, into palette slots
+ * indexed `x + z * width`. The result gives the same bricks as the function, in
+ * `Terrain.fillBrick` and `FineTerrain.fillBrick` (which look `top` up on coarse columns), and it
+ * crosses to a worker.
+ *
+ * @param terrain - The (coarse) terrain the override is looked up on.
+ * @param top - Palette slot per column, 0 for none; must be an integer 0..255 (world voxels are 8-bit).
+ * @returns One slot per column.
+ */
+export function topOverrideData(terrain: Terrain, top: TopOverride): Uint8Array {
+  const W = terrain.width, D = terrain.depth;
+  if (typeof top !== "function") {
+    if (top.length !== W * D) throw new RangeError(`topOverrideData: ${top.length} columns, the terrain has ${W} x ${D}`);
+    return top.slice();
+  }
+  const out = new Uint8Array(W * D);
+  for (let z = 0; z < D; z++)
+    for (let x = 0; x < W; x++) {
+      const v = top(x, z);
+      if (!(v >= 0 && v <= 255 && Number.isInteger(v))) throw new RangeError(`topOverrideData: slot ${v} at (${x}, ${z}) is not an integer 0..255`);
+      out[x + z * W] = v;
+    }
+  return out;
+}
+
 export { buildRoles, ROLE, ROLE_COUNT, SUMMER } from "./roles";
 export type { ColorSet } from "./roles";
 export { refineTerrain } from "./fine";
 export type { FineTerrain, FineTerrainOptions } from "./fine";
+export { fineTerrainFrom, fineTerrainInit } from "./init";
+export type { FineTerrainInit } from "./init";

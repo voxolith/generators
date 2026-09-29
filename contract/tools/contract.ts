@@ -9,7 +9,9 @@
 // deterministic generation from the injected rng (no state leaking between
 // calls, inputs untouched), output values within the declared roles, the
 // anchor inside the model, nothing floating, share codes that rebuild the
-// same model, and every parameter extreme still generating.
+// same model, every parameter extreme still generating, and finer scales that
+// stay within one native voxel of the native model (so a level-of-detail
+// chain can cover every level with the native occupancy grown by one).
 
 import { seededRandom } from "@voxolith/renderer/core";
 import {
@@ -31,6 +33,7 @@ import { registerRockGenerators } from "@voxolith/gen-rock";
 import { registerBuildingGenerators } from "@voxolith/gen-building";
 import { registerCreatureGenerators } from "@voxolith/gen-creature";
 import { bakePose, poseMatrices, sampleClip } from "@voxolith/engine/animation";
+import { chebyshevDistance, measureReach, REACH_CAP } from "./reach";
 
 registerTreeGenerators();
 registerBushGenerators();
@@ -242,6 +245,7 @@ for (const gen of listGenerators()) {
   ok(sameData(gen.generate(structuredClone(gen.defaults), seededRandom(1234), { voxelsPerMetre: 10 }), a), "a context at the native 10 voxels per metre gives the same model");
 
   // Finer scales: the same design, k times the size, sparse, within budget.
+  const nativeDist = !quick || fineOnly ? chebyshevDistance(a.model) : null;
   if (!quick || fineOnly)
     for (const vpm of gen.scales ?? []) {
       const k = Math.round(vpm / 10);
@@ -265,13 +269,21 @@ for (const gen of listGenerators()) {
       const loose = new Set((gen.looseRoles ?? []).map((id) => m.roles.findIndex((r) => r.id === id) + 1).filter((v) => v > 0));
       const g = groundedSparse(m, loose);
       ok(g.grounded >= 0.99, `${lab}: nothing structural floats`, `${(100 - g.grounded * 100).toFixed(2)}% of ${g.voxels} voxels not connected to the base`);
+      // Every fine voxel, divided by k, lies within one native voxel (26
+      // neighbours) of the native model. Loose roles too: a level-of-detail
+      // chain covers the fine levels with the native occupancy grown by one,
+      // and a leaf outside that cover would not be drawn.
+      const reach = measureReach(a.model, m, k, new Set(), nativeDist!);
+      const w = reach.worst;
+      ok(reach.beyond === 0, `${lab}: stays within one native voxel of the native model`,
+        `${reach.beyond} of ${reach.voxels} voxels further, up to ${reach.max >= REACH_CAP ? `${REACH_CAP}+` : reach.max}${w ? ` (${m.roles[w.role - 1]?.id} at ${w.x},${w.y},${w.z})` : ""}`);
       if (!quick) {
         const f2 = gen.generate(structuredClone(gen.defaults), seededRandom(1234), { voxelsPerMetre: vpm });
         let same = f2.model.sparse!.bricks.size === m.sparse.bricks.size;
         if (same) for (const [key, br] of m.sparse.bricks) { const o = f2.model.sparse!.bricks.get(key); if (!o || !o.every((v, i) => v === br[i])) { same = false; break; } }
         ok(same, `${lab}: deterministic`);
       }
-      console.log(`  ${lab}: ${m.size.x}x${m.size.y}x${m.size.z}, ${g.voxels} voxels, ${m.sparse.bricks.size} bricks (${(bytes / 1048576).toFixed(0)} MB), ${(ms / 1000).toFixed(1)} s, ${(g.grounded * 100).toFixed(2)}% of the structure grounded`);
+      console.log(`  ${lab}: ${m.size.x}x${m.size.y}x${m.size.z}, ${g.voxels} voxels, ${m.sparse.bricks.size} bricks (${(bytes / 1048576).toFixed(0)} MB), ${(ms / 1000).toFixed(1)} s, ${(g.grounded * 100).toFixed(2)}% of the structure grounded, reach ${reach.max}`);
     }
 
   // Every parameter at its extremes still generates.

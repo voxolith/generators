@@ -17,7 +17,7 @@
 //     1 cm voxels costs its surface, not its volume.
 
 import { makeNoise } from "@voxolith/gen-kit";
-import type { Terrain } from "./index";
+import type { Terrain, TopOverride } from "./index";
 import { ROLE } from "./roles";
 
 type Vec3 = [number, number, number];
@@ -32,6 +32,12 @@ export interface FineTerrainOptions {
   skin?: number;
   /** Seeds the blade, pebble and boundary noise. */
   seed?: number;
+  /**
+   * The settlement's surface, used by `fillBrick` when a call passes no `top` of its own: a
+   * function of the coarse column or the same as data ({@link TopOverride}; data is what
+   * {@link fineTerrainInit} carries to a worker).
+   */
+  top?: TopOverride;
 }
 
 /**
@@ -43,8 +49,11 @@ export interface FineTerrain {
   readonly coarse: Terrain;
   /** Fine voxels per coarse voxel. */
   readonly k: number;
-  /** Extent in fine columns: the coarse extent times `k`. */
+  /** The options it was refined with, as given. */
+  readonly options: FineTerrainOptions;
+  /** Extent in fine columns along x: the coarse extent times `k`. */
   readonly width: number;
+  /** Extent in fine columns along z: the coarse extent times `k`. */
   readonly depth: number;
   /** Top fine voxel of the water, when a column is flooded. */
   readonly waterTop: number;
@@ -61,9 +70,9 @@ export interface FineTerrain {
   /**
    * Write one 8^3 brick, as Terrain.fillBrick. `top` is looked up on coarse
    * columns (the settlement's paths and yards) and applies to the top two
-   * fine voxels, with no blades.
+   * fine voxels, with no blades; without one, the options' `top` applies.
    */
-  fillBrick(cells: Uint8Array, ox: number, oy: number, oz: number, base: number, top?: (cx: number, cz: number) => number): boolean;
+  fillBrick(cells: Uint8Array, ox: number, oy: number, oz: number, base: number, top?: TopOverride): boolean;
   /** First point where a ray meets the ground (or, with `water`, the water), as Terrain.pick. */
   pick(origin: Vec3, dir: Vec3, opts?: { water?: boolean; maxT?: number }): Vec3 | null;
 }
@@ -87,7 +96,7 @@ function h2(x: number, z: number, s: number): number {
  *
  * @param coarse - The terrain at 10 voxels per metre.
  * @param k - Fine voxels per coarse voxel (2, 5 or 10; any integer works).
- * @param opts - Blade density and height, skin depth and seed.
+ * @param opts - Blade density and height, skin depth, seed and a default top override.
  * @returns The fine terrain; stream it brick by brick, editing a box per brick column
  * (`columnSpan`).
  */
@@ -164,7 +173,7 @@ export function refineTerrain(coarse: Terrain, k: number, opts: FineTerrainOptio
   const cache = [make(), make(), make(), make()];
   let nextSlot = 0;
   const ring = new Float64Array(100);
-  const columns = (ox: number, oz: number, override?: (cx: number, cz: number) => number): Columns => {
+  const columns = (ox: number, oz: number, override: TopOverride | undefined): Columns => {
     const key = (ox >> 3) + (oz >> 3) * 1e6;
     for (const c of cache) if (c.key === key && c.override === (override ?? null)) return c;
     const c = cache[nextSlot];
@@ -184,7 +193,7 @@ export function refineTerrain(coarse: Terrain, k: number, opts: FineTerrainOptio
       const [cx, cz] = coarseOf(x, z);
       const wet = coarse.waterAt(Math.floor(x / K), Math.floor(z / K));
       c.water[q] = wet ? waterTop : -1;
-      const over = override ? override(cx, cz) : 0;
+      const over = !override ? 0 : typeof override === "function" ? override(cx, cz) : override[cx + cz * CW];
       const t = coarse.topRole(cx, cz);
       c.t[q] = t;
       c.over[q] = over;
@@ -206,6 +215,7 @@ export function refineTerrain(coarse: Terrain, k: number, opts: FineTerrainOptio
   return {
     coarse,
     k: K,
+    options: opts,
     width: W,
     depth: D,
     waterTop,
@@ -217,7 +227,7 @@ export function refineTerrain(coarse: Terrain, k: number, opts: FineTerrainOptio
       return spanOf(ox, oz, ox + 7, oz + 7);
     },
     fillBrick(cells, ox, oy, oz, base, override) {
-      const c = columns(ox, oz, override);
+      const c = columns(ox, oz, override ?? opts.top);
       const b = base - 1;
       let touched = false;
       for (let q = 0; q < 64; q++) {
