@@ -69,14 +69,46 @@ export function fineTree(inp: FineTreeInput): { model: EntityModel; stats: { vox
     // The coarse box's cells, as fine coordinates (lo inclusive, hi exclusive).
     const lo = [0, 1, 2].map((i) => (Math.floor(Math.min(s.a[i], s.b[i]) - pad) - cropOffset[i]) * k);
     const hi = [0, 1, 2].map((i) => (Math.ceil(Math.max(s.a[i], s.b[i]) + pad) + 1 - cropOffset[i]) * k);
+    const plain = (x: number, y: number, z: number) =>
+      wood.flare((x + 0.5) / k + cropOffset[0] - 0.5, (y + 0.5) / k + cropOffset[1] - 0.5, (z + 0.5) / k + cropOffset[2] - 0.5);
+    // Speed, all exact (the voxels written are the same as clamping every
+    // point). shellCapsule calls this for every point of a scan box sized for
+    // the widest flare, and wood.flare (atan2, cos, pow) is the cost, so first
+    // settle on geometry alone the points whose outcome no factor >= 1 can
+    // change: further out than the widest flare, or inside the hollow of even
+    // the unflared limb (shellCapsule's radius there is ra..rb, each at least
+    // one voxel, times this factor). Then the clamp: the limit is never nearer
+    // the axis than the box's nearest face (a 6-norm of direction over room is
+    // at most 1 over the smallest room), and the smooth minimum only moves a
+    // radius above 0.8 of the limit, so a flared radius under that, or a point
+    // outside even the unclamped radius (the clamp only shrinks it), keeps the
+    // plain factor; and a point more than the shell inside the smallest
+    // clamped radius (min(unclamped, nearest face) less the smooth minimum's
+    // largest dip, a sixteenth of the unclamped) stays skipped.
+    const shellW = Math.max(2, Math.min(4, Math.ceil(k * 0.4))); // drawSkeletonFine's default
+    let near = Infinity;
+    for (let i = 0; i < 3; i++) near = Math.min(near, hi[i] - Math.max(fa[i], fb[i]), Math.min(fa[i], fb[i]) - lo[i]);
+    const nearLim = near - 0.5, free = 0.8 * nearLim;
+    const clamp = Math.max(1, Math.max(s.ra, s.rb) * k) * wood.maxFlare > free;
+    const ra1 = Math.max(1, s.ra * k), rb1 = Math.max(1, s.rb * k), mf2 = wood.maxFlare * wood.maxFlare;
+    // (Past the widest flare at this point's height, too: wood.flareBound.)
     const v = [0, 0, 0];
     return (x: number, y: number, z: number) => {
-      const f = wood.flare((x + 0.5) / k + cropOffset[0] - 0.5, (y + 0.5) / k + cropOffset[1] - 0.5, (z + 0.5) / k + cropOffset[2] - 0.5);
-      if (f <= 1) return f;
       const t = Math.max(0, Math.min(1, ((x + 0.5 - fa[0]) * dx + (y + 0.5 - fa[1]) * dy + (z + 0.5 - fa[2]) * dz) / l2));
       v[0] = x + 0.5 - fa[0] - dx * t; v[1] = y + 0.5 - fa[1] - dy * t; v[2] = z + 0.5 - fa[2] - dz * t;
-      const d = Math.hypot(v[0], v[1], v[2]);
+      const d2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+      const rs = ra1 + (rb1 - ra1) * t, hollow = rs - shellW;
+      if (d2 > rs * rs * mf2 || (hollow > 0 && d2 < hollow * hollow)) return 1;
+      const fb = wood.flareBound((y + 0.5) / k + cropOffset[1] - 0.5);
+      if (d2 > rs * rs * fb * fb) return 1;
+      const f = plain(x, y, z);
+      if (f <= 1 || !clamp) return f;
       const r = Math.max(1, (s.ra + (s.rb - s.ra) * t) * k);
+      const fr0 = f * r;
+      if (fr0 <= free || d2 > fr0 * fr0) return f;
+      const deep = Math.min(fr0, nearLim) - 0.0625 * fr0 - shellW;
+      if (deep > 0 && d2 < deep * deep) return f;
+      const d = Math.hypot(v[0], v[1], v[2]);
       if (d < 1e-6) return f;
       // Distance from the axis to the box along this direction, corners
       // rounded by a 6-norm (never further than the box itself).
@@ -88,13 +120,20 @@ export function fineTree(inp: FineTreeInput): { model: EntityModel; stats: { vox
       }
       const lim = Math.pow(sum, -1 / 6);
       // Polynomial smooth minimum of the flared radius and the limit (never above either).
-      const soft = 0.2 * lim, fr = f * r, h = Math.max(0, soft - Math.abs(fr - lim)) / soft;
-      return Math.max(1, (Math.min(fr, lim) - (h * h * soft) / 4) / r);
+      const soft = 0.2 * lim, h = Math.max(0, soft - Math.abs(fr0 - lim)) / soft;
+      return Math.max(1, (Math.min(fr0, lim) - (h * h * soft) / 4) / r);
     };
   };
+  // Only trunk segments whose scan box dips below the flare's top need it;
+  // the rest get no flare function and a box maxFlare times narrower (the
+  // flare is 1 there, so the voxels are the same, far fewer are tested).
+  const flared = (s: (typeof segments)[number]) =>
+    s.level === 0 && Math.min(s.a[1], s.b[1]) - Math.max(s.ra, s.rb) * wood.maxFlare - 2 < wood.flareTop;
   let voxels = 0;
-  for (const s of segments)
-    voxels += drawSkeletonFine(w, [s], { k, toFine, value, flare: s.level === 0 ? flareIn(s) : undefined, maxFlare: wood.maxFlare });
+  for (const s of segments) {
+    const fl = flared(s);
+    voxels += drawSkeletonFine(w, [s], { k, toFine, value, flare: fl ? flareIn(s) : undefined, maxFlare: fl ? wood.maxFlare : 1 });
+  }
   const shell = Math.max(2, Math.min(4, Math.ceil(k * 0.4)));
   for (const r of wood.roots) voxels += shellCapsule(w, toFine(r.a), toFine(r.b), r.ra * k, r.rb * k, shell, value);
   return { model, stats: { voxels, bricks: model.sparse!.bricks.size, ms: performance.now() - t0 } };

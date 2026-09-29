@@ -21,6 +21,10 @@ export interface WoodResult {
   flare: (x: number, y: number, z: number) => number;
   /** Largest value `flare` takes. */
   maxFlare: number;
+  /** Volume y at and above which `flare` is 1. */
+  flareTop: number;
+  /** The largest value `flare` takes anywhere at volume height `y` (a cheap bound for the fine redraw). */
+  flareBound: (y: number) => number;
   /** Surface roots as drawn: volume-space capsules. */
   roots: { a: Vec3; b: Vec3; ra: number; rb: number }[];
 }
@@ -41,6 +45,13 @@ export function voxelizeWood(vol: Volume, skel: Skeleton, shape: ShapeParams, or
     const th = Math.atan2(z + 0.5 - origin[2], x + 0.5 - origin[0]);
     const lobe = 1 + 0.45 * Math.max(0, Math.cos(lobes * (th - lobePhase)));
     return 1 + gain * f * lobe;
+  };
+
+  // flare's largest value over the angle at height y: the lobe term peaks at 1.45.
+  const flareBound = (y: number): number => {
+    const yy = y + 0.5 - origin[1];
+    if (yy >= flareH || yy < 0) return 1;
+    return 1 + gain * Math.pow((flareH - yy) / flareH, 2) * 1.45;
   };
 
   let filled = 0;
@@ -81,5 +92,5 @@ export function voxelizeWood(vol: Volume, skel: Skeleton, shape: ShapeParams, or
     });
   }
 
-  return { segId, filled, flare, maxFlare: 1 + gain * 1.45, roots };
+  return { segId, filled, flare, maxFlare: 1 + gain * 1.45, flareTop: origin[1] + flareH, flareBound, roots };
 }
