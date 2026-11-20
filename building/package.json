@@ -9,7 +9,7 @@
   "homepage": "https://github.com/voxolith/generators/tree/main/building#readme",
   "bugs": "https://github.com/voxolith/generators/issues",
   "keywords": ["voxel", "building", "house", "architecture", "procedural", "generator", "voxolith"],
-  "files": ["src", "README.md"],
+  "files": ["src", "README.md", "LICENSE"],
   "exports": { ".": "./src/index.ts" },
   "publishConfig": { "access": "public" },
   "scripts": {
@@ -19,5 +19,5 @@
     "gen": "bun tools/gen.ts"
   },
   "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/gen-kit": "workspace:*", "@voxolith/renderer": "workspace:*" },
-  "devDependencies": { "@types/node": "^26.6.2", "typescript": "^7.0.2" }
+  "devDependencies": { "@types/node": "^26.6.6", "typescript": "^7.0.2" }
 }

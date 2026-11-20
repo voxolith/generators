@@ -9,7 +9,7 @@
   "homepage": "https://github.com/voxolith/generators/tree/main/kit#readme",
   "bugs": "https://github.com/voxolith/generators/issues",
   "keywords": ["voxel", "procedural", "generator", "toolkit", "voxolith"],
-  "files": ["src", "README.md"],
+  "files": ["src", "README.md", "LICENSE"],
   "exports": { ".": "./src/index.ts", "./preview": "./src/preview/index.ts" },
   "publishConfig": { "access": "public" },
   "scripts": {
@@ -17,5 +17,5 @@
     "verify": "bun tools/verify.ts"
   },
   "dependencies": { "@voxolith/engine": "workspace:*", "@voxolith/renderer": "workspace:*" },
-  "devDependencies": { "@types/node": "^26.6.2", "typescript": "^7.0.2" }
+  "devDependencies": { "@types/node": "^26.6.6", "typescript": "^7.0.2" }
 }

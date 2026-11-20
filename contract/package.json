@@ -18,7 +18,7 @@
     "@voxolith/gen-grass": "workspace:*",
     "@voxolith/gen-rock": "workspace:*",
     "@voxolith/gen-building": "workspace:*",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
     "@voxolith/gen-creature": "workspace:*",
     "@voxolith/gen-kit": "workspace:*"

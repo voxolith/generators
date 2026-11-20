@@ -3,3 +3,6 @@ dist
 previews
 out
 *.local
+bun.lock
+.DS_Store
+.idea/

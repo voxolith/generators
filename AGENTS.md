@@ -71,8 +71,9 @@ default, never the step: a new step silently changes what old codes decode to.
   depends on its siblings as `"workspace:*"`. Run `bun install` from that root, never inside a
   repo. [CONTRIBUTING](https://github.com/voxolith/.github/blob/main/CONTRIBUTING.md) lists
   which siblings each repo needs.
-- **Toolchain: bun only.** There is no npm or node step anywhere. It is TypeScript 7 and Vite 8;
-  scripts run `tsc`, `vite` and `bun tools/x.ts`. Use current dependency versions.
+- **Toolchain: bun.** Bun is the only toolchain used locally, though Node is installed too, and
+  CI's GitHub runners have Node. It is TypeScript 7 and Vite 8; scripts run `tsc`, `vite` and
+  `bun tools/x.ts`. Use current dependency versions.
 - **`tsconfig.base.json` is byte-identical in every repo**, because consumers compile the
   renderer's and engine's sources under their own flags. Change it everywhere or nowhere.
 - **WebGPU, not WebGL.** Dev servers are HTTPS (`@vitejs/plugin-basic-ssl`), because WebGPU needs a

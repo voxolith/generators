@@ -5,13 +5,26 @@ name: Publish to npm
 # package's package.json. Needs the NPM_TOKEN repository secret (an npm
 # automation token with publish rights on the @voxolith scope).
 #
-# Per-package tags rather than one repo-wide version: the three generators are
-# separate packages with separate release cadences, and a shared version would
-# force a release of all three whenever one changed.
+# Per-package tags rather than one repo-wide version: the eight packages (kit,
+# tree, bush, grass, rock, building, creature, terrain) have separate release
+# cadences, and a shared version would force a release of all of them whenever
+# one changed. The private contract package is never published.
+#
+# Order matters for a first release: every generator depends on
+# @voxolith/gen-kit, so publish kit (and the engine and renderer it depends on)
+# before the others.
 
 on:
   push:
-    tags: ["tree-v*", "bush-v*", "grass-v*", "rock-v*", "building-v*"]
+    tags:
+      - "kit-v*"
+      - "tree-v*"
+      - "bush-v*"
+      - "grass-v*"
+      - "rock-v*"
+      - "building-v*"
+      - "creature-v*"
+      - "terrain-v*"
 
 permissions:
   contents: write
@@ -20,14 +33,14 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: generators
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: voxolith/engine
           path: engine
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: voxolith/renderer
           path: renderer
