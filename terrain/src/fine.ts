@@ -88,14 +88,14 @@ function h2(x: number, z: number, s: number): number {
 }
 
 /**
- * The same terrain `k` times finer, for a world at 20, 50 or 100 voxels per metre. Nothing is built
+ * The same terrain `k` times finer, for a world at 20, 30, 40, 50 or 100 voxels per metre. Nothing is built
  * up front: the result wraps `coarse` and fills any brick on demand, with a bicubic surface
  * through the coarse column tops, organic boundaries between surface roles, grass blades on grassy
  * ground and pebbles on beds and paths. Only a skin of ground is written, so cost follows the
  * surface. Edits to `coarse.heights` (levelled pads) carry through.
  *
  * @param coarse - The terrain at 10 voxels per metre.
- * @param k - Fine voxels per coarse voxel (2, 5 or 10; any integer works).
+ * @param k - Fine voxels per coarse voxel (2, 3, 4, 5 or 10; any integer works).
  * @param opts - Blade density and height, skin depth, seed and a default top override.
  * @returns The fine terrain; stream it brick by brick, editing a box per brick column
  * (`columnSpan`).

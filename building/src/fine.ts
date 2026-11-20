@@ -14,7 +14,9 @@
 // The coarse building is generated without its relief (recessed joints),
 // since here the joints are drawn at their own scale. At 20 voxels per metre
 // (5 cm) a brick course or a slate is under two voxels, so there the courses,
-// tiles and boards are drawn at about twice their real size instead.
+// tiles and boards are drawn at about twice their real size instead (about
+// 1.4 times at 30, where the same minimum sizes still apply; from 40 on they
+// are within a voxel of real size).
 
 import { hash4, refine, SparseWriter, type RefineCell, type RoleRule } from "@voxolith/gen-kit";
 import type { EntityModel } from "@voxolith/engine";

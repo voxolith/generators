@@ -263,7 +263,7 @@ console.log("rebuilt from data (a worker's copy):");
   }
   ok(coarseCells === 0, `coarse fillBrick with the override as data matches the closure over ${coarseBricks} bricks`);
 
-  for (const K of [5, 10]) {
+  for (const K of [3, 4, 5, 10]) {
     const fine = refineTerrain(c, K, { seed: 5 });
     const t0 = performance.now();
     const init = fineTerrainInit(fine, top);
